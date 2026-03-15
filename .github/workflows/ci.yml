@@ -4,24 +4,37 @@ on:
   push:
   pull_request:
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   test-linux:
     name: Test on Linux
     runs-on: ubuntu-latest
     env:
       IT_OPENSEARCH_URL: ${{ secrets.IT_OPENSEARCH_URL }}
-      IT_AWS_REGION: ${{ secrets.IT_AWS_REGION }}
-      IT_AWS_ACCESS_KEY_ID: ${{ secrets.IT_AWS_ACCESS_KEY_ID }}
-      IT_AWS_SECRET_ACCESS_KEY: ${{ secrets.IT_AWS_SECRET_ACCESS_KEY }}
-      IT_AWS_SESSION_TOKEN: ${{ secrets.IT_AWS_SESSION_TOKEN }}
       IT_BASIC_AUTH_USERNAME: ${{ secrets.IT_BASIC_AUTH_USERNAME }}
       IT_BASIC_AUTH_PASSWORD: ${{ secrets.IT_BASIC_AUTH_PASSWORD }}
       IT_IAM_ROLE_ARN: ${{ secrets.IT_IAM_ROLE_ARN }}
+      IT_AWS_REGION: us-west-2
       IT_TEST_INDEX: mcp-integration-test-linux
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.OPENSEARCH_MCP_CI_ROLE }}
+          aws-region: us-west-2
+
+      - name: Set AWS env vars for integration tests
+        run: |
+          echo "IT_AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}" >> $GITHUB_ENV
+          echo "IT_AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}" >> $GITHUB_ENV
+          echo "IT_AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}" >> $GITHUB_ENV
 
       - name: Set up Python 3
         uses: actions/setup-python@v5
@@ -77,18 +90,27 @@ jobs:
     runs-on: macOS-latest
     env:
       IT_OPENSEARCH_URL: ${{ secrets.IT_OPENSEARCH_URL }}
-      IT_AWS_REGION: ${{ secrets.IT_AWS_REGION }}
-      IT_AWS_ACCESS_KEY_ID: ${{ secrets.IT_AWS_ACCESS_KEY_ID }}
-      IT_AWS_SECRET_ACCESS_KEY: ${{ secrets.IT_AWS_SECRET_ACCESS_KEY }}
-      IT_AWS_SESSION_TOKEN: ${{ secrets.IT_AWS_SESSION_TOKEN }}
       IT_BASIC_AUTH_USERNAME: ${{ secrets.IT_BASIC_AUTH_USERNAME }}
       IT_BASIC_AUTH_PASSWORD: ${{ secrets.IT_BASIC_AUTH_PASSWORD }}
       IT_IAM_ROLE_ARN: ${{ secrets.IT_IAM_ROLE_ARN }}
+      IT_AWS_REGION: us-west-2
       IT_TEST_INDEX: mcp-integration-test-macos
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.OPENSEARCH_MCP_CI_ROLE }}
+          aws-region: us-west-2
+
+      - name: Set AWS env vars for integration tests
+        run: |
+          echo "IT_AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}" >> $GITHUB_ENV
+          echo "IT_AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}" >> $GITHUB_ENV
+          echo "IT_AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}" >> $GITHUB_ENV
 
       - name: Set up Python 3
         uses: actions/setup-python@v5
@@ -144,18 +166,28 @@ jobs:
     runs-on: windows-latest
     env:
       IT_OPENSEARCH_URL: ${{ secrets.IT_OPENSEARCH_URL }}
-      IT_AWS_REGION: ${{ secrets.IT_AWS_REGION }}
-      IT_AWS_ACCESS_KEY_ID: ${{ secrets.IT_AWS_ACCESS_KEY_ID }}
-      IT_AWS_SECRET_ACCESS_KEY: ${{ secrets.IT_AWS_SECRET_ACCESS_KEY }}
-      IT_AWS_SESSION_TOKEN: ${{ secrets.IT_AWS_SESSION_TOKEN }}
       IT_BASIC_AUTH_USERNAME: ${{ secrets.IT_BASIC_AUTH_USERNAME }}
       IT_BASIC_AUTH_PASSWORD: ${{ secrets.IT_BASIC_AUTH_PASSWORD }}
       IT_IAM_ROLE_ARN: ${{ secrets.IT_IAM_ROLE_ARN }}
+      IT_AWS_REGION: us-west-2
       IT_TEST_INDEX: mcp-integration-test-windows
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.OPENSEARCH_MCP_CI_ROLE }}
+          aws-region: us-west-2
+
+      - name: Set AWS env vars for integration tests
+        shell: pwsh
+        run: |
+          "IT_AWS_ACCESS_KEY_ID=$env:AWS_ACCESS_KEY_ID" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "IT_AWS_SECRET_ACCESS_KEY=$env:AWS_SECRET_ACCESS_KEY" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "IT_AWS_SESSION_TOKEN=$env:AWS_SESSION_TOKEN" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Set up Python 3
         uses: actions/setup-python@v5
