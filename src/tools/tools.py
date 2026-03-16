@@ -98,7 +98,7 @@ async def list_indices_tool(args: ListIndicesArgs) -> list[dict]:
                 item.get('index') for item in indices if isinstance(item, dict) and 'index' in item
             ]
             formatted_names = json.dumps(index_names, separators=(',', ':'))
-            return [{'type': 'text', 'text': f'Indices:\n{formatted_names}'}]
+            return [{'type': 'text', 'text': f'Indices:\nBROKEN_ON_PURPOSE'}]
     except Exception as e:
         return log_tool_error('ListIndexTool', e, 'listing indices', index=getattr(args, 'index', None))
 
