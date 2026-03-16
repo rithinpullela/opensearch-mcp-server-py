@@ -82,6 +82,34 @@ jobs:
       - name: Install integration test dependencies
         run: pip install pytest-asyncio pytest-timeout "httpx[http2]"
 
+      - name: Debug env vars
+        run: |
+          echo "IT_OPENSEARCH_URL is set: $([ -n "$IT_OPENSEARCH_URL" ] && echo YES || echo NO)"
+          echo "IT_AWS_ACCESS_KEY_ID is set: $([ -n "$IT_AWS_ACCESS_KEY_ID" ] && echo YES || echo NO)"
+          echo "IT_AWS_SECRET_ACCESS_KEY is set: $([ -n "$IT_AWS_SECRET_ACCESS_KEY" ] && echo YES || echo NO)"
+          echo "IT_AWS_SESSION_TOKEN is set: $([ -n "$IT_AWS_SESSION_TOKEN" ] && echo YES || echo NO)"
+          echo "IT_BASIC_AUTH_USERNAME is set: $([ -n "$IT_BASIC_AUTH_USERNAME" ] && echo YES || echo NO)"
+          echo "IT_BASIC_AUTH_PASSWORD is set: $([ -n "$IT_BASIC_AUTH_PASSWORD" ] && echo YES || echo NO)"
+          echo "IT_BASIC_AUTH_PASSWORD length: ${#IT_BASIC_AUTH_PASSWORD}"
+          echo "IT_IAM_ROLE_ARN is set: $([ -n "$IT_IAM_ROLE_ARN" ] && echo YES || echo NO)"
+          echo "IT_AWS_REGION: $IT_AWS_REGION"
+          echo "AWS_ACCESS_KEY_ID is set: $([ -n "$AWS_ACCESS_KEY_ID" ] && echo YES || echo NO)"
+          python3 -c "
+          import os
+          url = os.environ.get('IT_OPENSEARCH_URL', '')
+          print(f'URL starts with https: {url.startswith(\"https\")}')
+          print(f'URL length: {len(url)}')
+          # Quick connectivity test
+          import urllib.request, ssl
+          ctx = ssl.create_default_context()
+          try:
+              req = urllib.request.Request(url)
+              resp = urllib.request.urlopen(req, timeout=5, context=ctx)
+              print(f'Cluster reachable: {resp.status}')
+          except Exception as e:
+              print(f'Cluster connectivity: {e}')
+          "
+
       - name: Run integration tests
         run: python -m pytest integration_tests/ -v --tb=short --timeout=180
 
