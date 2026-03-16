@@ -18,7 +18,7 @@ jobs:
       IT_BASIC_AUTH_PASSWORD: ${{ secrets.IT_BASIC_AUTH_PASSWORD }}
       IT_IAM_ROLE_ARN: ${{ secrets.IT_IAM_ROLE_ARN }}
       IT_AWS_REGION: us-west-2
-      IT_TEST_INDEX: mcp-integration-test-linux
+      IT_TEST_INDEX: mcp-it-linux-${{ github.run_id }}
 
     steps:
       - name: Checkout Repository
@@ -94,7 +94,7 @@ jobs:
       IT_BASIC_AUTH_PASSWORD: ${{ secrets.IT_BASIC_AUTH_PASSWORD }}
       IT_IAM_ROLE_ARN: ${{ secrets.IT_IAM_ROLE_ARN }}
       IT_AWS_REGION: us-west-2
-      IT_TEST_INDEX: mcp-integration-test-macos
+      IT_TEST_INDEX: mcp-it-macos-${{ github.run_id }}
 
     steps:
       - name: Checkout Repository
@@ -170,7 +170,7 @@ jobs:
       IT_BASIC_AUTH_PASSWORD: ${{ secrets.IT_BASIC_AUTH_PASSWORD }}
       IT_IAM_ROLE_ARN: ${{ secrets.IT_IAM_ROLE_ARN }}
       IT_AWS_REGION: us-west-2
-      IT_TEST_INDEX: mcp-integration-test-windows
+      IT_TEST_INDEX: mcp-it-windows-${{ github.run_id }}
 
     steps:
       - name: Checkout Repository
