@@ -5,6 +5,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ## [Unreleased]
 ### Added
 - Add `User-Agent` header (`opensearch-mcp-server-py/<version>`) to all OpenSearch requests for MCP traffic identification in cluster logs ([#207](https://github.com/opensearch-project/opensearch-mcp-server-py/issues/207))
+- Add `AGENTS.md` and rewrite `DEVELOPER_GUIDE.md` "Adding Custom Tools" section with detailed 4-piece tool anatomy, error handling contracts, and tool category documentation ([#214](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/214))
 
 - Add OpenSearch mTLS support for single-cluster and multi-cluster configurations, including CA bundle, client certificate, and client key settings
 
