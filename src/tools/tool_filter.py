@@ -289,10 +289,6 @@ def process_tool_filter(
         # Add agentic_memory as a built-in category (not enabled by default)
         category_to_tools['agentic_memory'] = agentic_memory_display_names
 
-        # Auto-enable agentic_memory category when memory_container_id is configured
-        if os.getenv('OPENSEARCH_MEMORY_CONTAINER_ID', ''):
-            enabled_category_list.append('agentic_memory')
-
         # Process YAML config file if provided
         config = load_yaml_config(filter_path)
         if config:
@@ -312,12 +308,6 @@ def process_tool_filter(
             settings = tool_filters.get('settings', {})
             if settings:
                 allow_write = settings.get('allow_write', True)
-
-            # Auto-enable agentic_memory from YAML config
-            agentic_memory = config.get('agentic_memory', {})
-            if isinstance(agentic_memory, dict) and agentic_memory.get('memory_container_id'):
-                if 'agentic_memory' not in enabled_category_list:
-                    enabled_category_list.append('agentic_memory')
 
         # Process environment variables
         if tool_categories:
