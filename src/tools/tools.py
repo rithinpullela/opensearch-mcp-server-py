@@ -80,6 +80,7 @@ from opensearch.helper import (
     search_experiments,
 )
 from .skills_tools import SKILLS_TOOLS_REGISTRY
+from .agentic_memory import AGENTIC_MEMORY_TOOLS_REGISTRY
 from mcp_server_opensearch.clusters_information import cluster_registry
 
 
@@ -900,6 +901,7 @@ from .generic_api_tool import GenericOpenSearchApiArgs, generic_opensearch_api_t
 # Registry of available OpenSearch tools with their metadata
 TOOL_REGISTRY = {
     **SKILLS_TOOLS_REGISTRY,
+    **AGENTIC_MEMORY_TOOLS_REGISTRY,
     'ListIndexTool': {
         'display_name': 'ListIndexTool',
         'description': 'Lists indices in the OpenSearch cluster. If an index name or pattern is specified, return only information about the provided index or index pattern. The include_detail flag controls output: if False, returns only index name(s); if True (default), returns full metadata.',

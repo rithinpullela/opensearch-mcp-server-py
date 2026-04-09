@@ -99,6 +99,57 @@ def _resolve_allow_write_setting(config_file_path: str = None) -> bool:
     return allow_write
 
 
+
+def _resolve_memory_container_id(config_file_path: str = None) -> str:
+    """Resolve memory_container_id from config file or environment variable.
+
+    Args:
+        config_file_path: Optional path to config file
+
+    Returns:
+        str: The memory container ID, or empty string if not configured
+    """
+    if config_file_path and os.path.exists(config_file_path):
+        try:
+            config = load_yaml_config(config_file_path)
+            if config:
+                agentic_memory = config.get('agentic_memory', {})
+                if isinstance(agentic_memory, dict):
+                    container_id = agentic_memory.get('memory_container_id', '')
+                    if container_id:
+                        return container_id
+        except Exception as e:
+            logging.debug(f'Could not load memory_container_id from config: {e}')
+
+    return os.getenv('OPENSEARCH_MEMORY_CONTAINER_ID', '')
+
+
+def _set_memory_container_default(tool_registry: dict, container_id: str) -> None:
+    """Set memory_container_id default on Pydantic models for agentic memory tools.
+
+    This runs once at startup so Pydantic auto-fills the field when clients omit it.
+
+    Args:
+        tool_registry: The tool registry dict
+        container_id: The memory container ID to set as default
+    """
+    for name, info in tool_registry.items():
+        args_model = info.get('args_model')
+        if args_model and hasattr(args_model, 'model_fields'):
+            field = args_model.model_fields.get('memory_container_id')
+            if field is not None:
+                field.default = container_id
+                # Also update the JSON schema so MCP clients see the default
+                schema = info.get('input_schema', {})
+                props = schema.get('properties', {})
+                if 'memory_container_id' in props:
+                    props['memory_container_id']['default'] = container_id
+                # Remove from required in schema
+                if 'required' in schema and 'memory_container_id' in schema['required']:
+                    schema['required'].remove('memory_container_id')
+                logging.debug(f'Set memory_container_id default for {name}: {container_id}')
+
+
 def apply_write_filter(registry):
     """Apply allow_write filters to the registry."""
     for tool_name in list(registry.keys()):
@@ -217,6 +268,31 @@ def process_tool_filter(
         # Add search_relevance as a built-in category (not enabled by default)
         category_to_tools['search_relevance'] = search_relevance_display_names
 
+        # Initialize agentic_memory tool names
+        agentic_memory_tools = [
+            'CreateAgenticMemorySessionTool',
+            'AddAgenticMemoriesTool',
+            'GetAgenticMemoryTool',
+            'UpdateAgenticMemoryTool',
+            'DeleteAgenticMemoryByIDTool',
+            'DeleteAgenticMemoryByQueryTool',
+            'SearchAgenticMemoryTool',
+        ]
+
+        # Build agentic_memory tools list using display names
+        agentic_memory_display_names = []
+        for tool_name in agentic_memory_tools:
+            if tool_name in tool_registry:
+                tool_display_name = tool_registry[tool_name].get('display_name', tool_name)
+                agentic_memory_display_names.append(tool_display_name)
+
+        # Add agentic_memory as a built-in category (not enabled by default)
+        category_to_tools['agentic_memory'] = agentic_memory_display_names
+
+        # Auto-enable agentic_memory category when memory_container_id is configured
+        if os.getenv('OPENSEARCH_MEMORY_CONTAINER_ID', ''):
+            enabled_category_list.append('agentic_memory')
+
         # Process YAML config file if provided
         config = load_yaml_config(filter_path)
         if config:
@@ -236,6 +312,12 @@ def process_tool_filter(
             settings = tool_filters.get('settings', {})
             if settings:
                 allow_write = settings.get('allow_write', True)
+
+            # Auto-enable agentic_memory from YAML config
+            agentic_memory = config.get('agentic_memory', {})
+            if isinstance(agentic_memory, dict) and agentic_memory.get('memory_container_id'):
+                if 'agentic_memory' not in enabled_category_list:
+                    enabled_category_list.append('agentic_memory')
 
         # Process environment variables
         if tool_categories:
@@ -347,6 +429,12 @@ async def get_tools(tool_registry: dict, config_file_path: str = '') -> dict:
     # This needs to be done in both single and multi mode
     resolved_allow_write = _resolve_allow_write_setting(config_file_path)
     set_allow_write_setting(resolved_allow_write)
+
+    # Set memory_container_id Pydantic default on agentic memory tools if configured.
+    # This allows Pydantic to auto-fill the field when clients omit it.
+    memory_container_id = _resolve_memory_container_id(config_file_path)
+    if memory_container_id:
+        _set_memory_container_default(tool_registry, memory_container_id)
 
     # In multi mode, return all tools without any filtering
     if mode == 'multi':
