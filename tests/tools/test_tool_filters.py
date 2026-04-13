@@ -739,3 +739,91 @@ class TestAllowWriteSettings:
 
             mock_resolve.assert_called_once_with('/path/to/config.yml')
             mock_set.assert_called_once_with(False)
+
+
+class TestMultiOnlyFilter:
+    """Test cases for multi_only tool filtering in get_tools."""
+
+    def setup_method(self):
+        from mcp_server_opensearch.global_state import set_mode
+
+        set_mode('single')
+
+    @pytest.fixture
+    def registry_with_multi_only(self):
+        """Return a registry containing a multi_only tool and a normal tool."""
+        return {
+            'ListIndexTool': {
+                'display_name': 'ListIndexTool',
+                'description': 'List indices',
+                'input_schema': {'type': 'object', 'properties': {'param1': {'type': 'string'}}},
+                'function': MagicMock(),
+                'args_model': MagicMock(),
+                'min_version': '1.0.0',
+            },
+            'ListClustersTool': {
+                'display_name': 'ListClustersTool',
+                'description': 'Lists clusters',
+                'input_schema': {'type': 'object', 'properties': {}},
+                'function': MagicMock(),
+                'args_model': MagicMock(),
+                'http_methods': 'GET',
+                'multi_only': True,
+            },
+        }
+
+    @pytest.fixture
+    def mock_patches(self):
+        with (
+            patch('tools.tool_filter.get_opensearch_version') as mock_get_version,
+            patch('tools.tool_filter.is_tool_compatible', return_value=True) as mock_is_compatible,
+        ):
+            yield mock_get_version, mock_is_compatible
+
+    @pytest.mark.asyncio
+    async def test_multi_only_tool_excluded_in_single_mode(
+        self, registry_with_multi_only, mock_patches
+    ):
+        """Test that multi_only tools are excluded when running in single mode."""
+        mock_get_version, _ = mock_patches
+        mock_get_version.return_value = Version.parse('2.5.0')
+
+        with patch('tools.tool_filter.TOOL_REGISTRY', registry_with_multi_only):
+            result = await get_tools(registry_with_multi_only)
+
+        assert 'ListIndexTool' in result
+        assert 'ListClustersTool' not in result
+
+    @pytest.mark.asyncio
+    async def test_multi_only_tool_included_in_multi_mode(self, registry_with_multi_only):
+        """Test that multi_only tools are included when running in multi mode."""
+        from mcp_server_opensearch.global_state import set_mode
+
+        set_mode('multi')
+
+        result = await get_tools(registry_with_multi_only)
+
+        assert 'ListIndexTool' in result
+        assert 'ListClustersTool' in result
+
+    @pytest.mark.asyncio
+    async def test_tools_without_multi_only_unaffected(self, mock_patches):
+        """Test that tools without multi_only flag are not affected by the filter."""
+        mock_get_version, _ = mock_patches
+        mock_get_version.return_value = Version.parse('2.5.0')
+
+        registry = {
+            'ListIndexTool': {
+                'display_name': 'ListIndexTool',
+                'description': 'List indices',
+                'input_schema': {'type': 'object', 'properties': {}},
+                'function': MagicMock(),
+                'args_model': MagicMock(),
+                'min_version': '1.0.0',
+            },
+        }
+
+        with patch('tools.tool_filter.TOOL_REGISTRY', registry):
+            result = await get_tools(registry)
+
+        assert 'ListIndexTool' in result

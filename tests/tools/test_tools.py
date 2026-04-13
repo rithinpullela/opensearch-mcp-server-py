@@ -1357,3 +1357,84 @@ class TestTools:
         )
         assert self.GetShardsArgs(index='test', opensearch_cluster_name='').index == 'test'
         assert isinstance(self.ListIndicesArgs(opensearch_cluster_name=''), self.ListIndicesArgs)
+
+
+class TestListClustersTool:
+    """Test cases for the list_clusters_tool function."""
+
+    def setup_method(self):
+        """Setup that runs before each test method."""
+        self.init_client_patcher = patch(
+            'opensearch.client.initialize_client', return_value=Mock()
+        )
+        self.init_client_patcher.start()
+
+        from tools.tools import list_clusters_tool, ListClustersArgs
+
+        self._list_clusters_tool = list_clusters_tool
+        self.ListClustersArgs = ListClustersArgs
+
+    def teardown_method(self):
+        self.init_client_patcher.stop()
+
+    @pytest.mark.asyncio
+    async def test_list_clusters_returns_cluster_names(self):
+        """Test that list_clusters_tool returns names from cluster_registry."""
+        with patch(
+            'tools.tools.cluster_registry',
+            {'cluster-a': Mock(), 'cluster-b': Mock(), 'cluster-c': Mock()},
+        ):
+            args = self.ListClustersArgs()
+            result = await self._list_clusters_tool(args)
+
+            assert len(result) == 1
+            assert result[0]['type'] == 'text'
+            assert 'cluster-a' in result[0]['text']
+            assert 'cluster-b' in result[0]['text']
+            assert 'cluster-c' in result[0]['text']
+            # Verify it's valid JSON in the output
+            text = result[0]['text']
+            json_part = text.split('\n', 1)[1]
+            parsed = json.loads(json_part)
+            assert parsed == ['cluster-a', 'cluster-b', 'cluster-c']
+
+    @pytest.mark.asyncio
+    async def test_list_clusters_empty_registry(self):
+        """Test that list_clusters_tool returns empty list when no clusters configured."""
+        with patch('tools.tools.cluster_registry', {}):
+            args = self.ListClustersArgs()
+            result = await self._list_clusters_tool(args)
+
+            assert len(result) == 1
+            assert result[0]['type'] == 'text'
+            text = result[0]['text']
+            json_part = text.split('\n', 1)[1]
+            parsed = json.loads(json_part)
+            assert parsed == []
+
+    @pytest.mark.asyncio
+    async def test_list_clusters_single_cluster(self):
+        """Test with a single cluster in the registry."""
+        with patch('tools.tools.cluster_registry', {'my-cluster': Mock()}):
+            args = self.ListClustersArgs()
+            result = await self._list_clusters_tool(args)
+
+            text = result[0]['text']
+            json_part = text.split('\n', 1)[1]
+            parsed = json.loads(json_part)
+            assert parsed == ['my-cluster']
+
+    def test_list_clusters_args_accepts_extra_fields(self):
+        """Test that ListClustersArgs doesn't reject extra fields like opensearch_cluster_name."""
+        args = self.ListClustersArgs(**{'opensearch_cluster_name': 'test'})
+        assert args is not None
+
+    def test_list_clusters_in_tool_registry(self):
+        """Test that ListClustersTool is present in TOOL_REGISTRY with correct metadata."""
+        from tools.tools import TOOL_REGISTRY
+
+        assert 'ListClustersTool' in TOOL_REGISTRY
+        tool_info = TOOL_REGISTRY['ListClustersTool']
+        assert tool_info['display_name'] == 'ListClustersTool'
+        assert tool_info['multi_only'] is True
+        assert tool_info['http_methods'] == 'GET'

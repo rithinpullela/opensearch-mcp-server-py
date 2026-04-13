@@ -62,6 +62,12 @@ class baseToolArgs(BaseModel):
     opensearch_cluster_name: str = Field(description='The name of the OpenSearch cluster')
 
 
+class ListClustersArgs(BaseModel):
+    """Arguments for the ListClustersTool. No parameters required."""
+
+    pass
+
+
 class ListIndicesArgs(baseToolArgs):
     index: str = Field(
         default='',
