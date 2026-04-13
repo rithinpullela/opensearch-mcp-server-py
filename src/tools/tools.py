@@ -122,7 +122,7 @@ async def list_indices_tool(args: ListIndicesArgs) -> list[dict]:
                 # Return full metadata for all indices
                 indices = await list_indices(args)
                 formatted_indices = json.dumps(indices, separators=(',', ':'))
-                return [{'type': 'text', 'text': f'All indices information:\n{formatted_indices}'}]
+                return [{'type': 'text', 'text': formatted_indices}]
         else:
             # Return minimal information (names only)
             indices = await list_indices(args)
