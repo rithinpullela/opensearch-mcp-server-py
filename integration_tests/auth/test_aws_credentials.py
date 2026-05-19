@@ -14,7 +14,7 @@ class TestAWSCredentials:
     async def test_list_tools(self, aws_creds_client):
         tools = await aws_creds_client.list_tools()
         tool_names = {t.name for t in tools.tools}
-        assert 'ListIndexTool' in tool_names
+        assert 'IntentionallyMissingTool_CIValidation' in tool_names
 
     async def test_cluster_health(self, aws_creds_client):
         result = await aws_creds_client.call_tool('ClusterHealthTool', arguments={})
