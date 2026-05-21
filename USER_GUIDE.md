@@ -564,7 +564,7 @@ python -m mcp_server_opensearch --mode multi
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `--transport` | string | `stdio` | Transport type: `stdio` or `stream` |
-| `--host` | string | `0.0.0.0` | Host to bind to (streaming only) |
+| `--host` | string | `127.0.0.1` | Host to bind to (streaming only). Pass `0.0.0.0` to expose on all interfaces; the listener has no built-in auth, so front it with an authenticating proxy or restrict access via network controls. |
 | `--port` | integer | `9900` | Port to listen on (streaming only) |
 | `--mode` | string | `single` | Server mode: `single` or `multi` |
 | `--profile` | string | `''` | AWS profile to use for OpenSearch connection |

@@ -113,7 +113,11 @@ def main() -> None:
         default='stdio',
         help='Transport type (stdio or stream)',
     )
-    parser.add_argument('--host', default='0.0.0.0', help='Host to bind to (streaming only)')
+    parser.add_argument(
+        '--host',
+        default='127.0.0.1',
+        help='Host to bind to (streaming only). Defaults to loopback; pass 0.0.0.0 to expose on all interfaces.',
+    )
     parser.add_argument(
         '--port', type=int, default=9900, help='Port to listen on (streaming only)'
     )

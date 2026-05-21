@@ -156,7 +156,7 @@ class MCPStarletteApp:
 
 
 async def serve(
-    host: str = '0.0.0.0',
+    host: str = '127.0.0.1',
     port: int = 9900,
     mode: str = 'single',
     profile: str = '',

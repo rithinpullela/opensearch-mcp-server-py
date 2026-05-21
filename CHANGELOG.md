@@ -13,6 +13,9 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 - Add OpenSearch mTLS support for single-cluster and multi-cluster configurations, including CA bundle, client certificate, and client key settings
 
+### Changed
+- Default `--host` for the `stream` transport from `0.0.0.0` to `127.0.0.1` so the streamable HTTP listener binds to loopback by default. Operators who need to expose the listener on other interfaces opt in explicitly with `--host 0.0.0.0` ([#253](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/253))
+
 ### Infrastructure
 - Add code quality CI job running `ruff format --check` and `ruff check` on every PR ([#241](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/241))
 - Fix all ruff linting issues: replace star imports with explicit imports, add missing docstrings, fix docstring formatting ([#241](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/241))
