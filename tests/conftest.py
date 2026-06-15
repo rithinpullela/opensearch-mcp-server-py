@@ -5,6 +5,22 @@ import os
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _clear_version_cache():
+    """Reset the process-global OpenSearch version cache before every test.
+
+    ``get_opensearch_version`` now reads through ``opensearch.version_cache``, which
+    is module-global state that persists across tests. Tests that mock a cluster
+    version (directly or via a tool call hitting the version gate) would otherwise
+    see a value cached by an earlier test under the shared single-mode key. Clearing
+    before each test restores isolation without any production change.
+    """
+    from opensearch.version_cache import clear_cache
+
+    clear_cache()
+    yield
+
+
 def pytest_addoption(parser):
     parser.addoption(
         '--run-evals',

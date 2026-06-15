@@ -750,11 +750,12 @@ def _flatten_object(obj: dict, row: dict, prefix: str = '') -> None:
             row[field_name] = str(value) if value is not None else ''
 
 
-async def get_opensearch_version(args: baseToolArgs) -> Version:
-    """Get the version of OpenSearch cluster.
+async def _fetch_opensearch_version(args: baseToolArgs) -> Version:
+    """Fetch the OpenSearch cluster version directly (uncached).
 
-    Returns:
-        Version: The version of OpenSearch cluster (SemVer style)
+    Opens a client, issues ``GET /``, and parses ``version.number``. Returns
+    ``None`` on any error (preserving the prior fail-open behavior). This is the
+    real network fetch wrapped by the per-target version cache.
     """
     from .client import get_opensearch_client
 
@@ -765,6 +766,26 @@ async def get_opensearch_version(args: baseToolArgs) -> Version:
     except Exception as e:
         logger.error(f'Error getting OpenSearch version: {e}')
         return None
+
+
+async def get_opensearch_version(args: baseToolArgs) -> Version:
+    """Get the version of OpenSearch cluster (cached per connection target).
+
+    The version gate runs on every tool call; this previously opened a fresh
+    client and issued ``GET /`` each time. It now reads through a per-target,
+    TTL-bounded cache (see ``opensearch.version_cache``), so repeated calls against
+    a static cluster collapse to one fetch. Behavior is otherwise unchanged: the
+    same ``Version`` (or ``None`` on error) is returned.
+
+    Returns:
+        Version: The version of OpenSearch cluster (SemVer style), or ``None``.
+    """
+    from .version_cache import get_cached_version
+    from mcp_server_opensearch.global_state import get_mode
+
+    return await get_cached_version(
+        args, fetch=lambda: _fetch_opensearch_version(args), mode=get_mode()
+    )
 
 
 async def create_agentic_memory_session(
