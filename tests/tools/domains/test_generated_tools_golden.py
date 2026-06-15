@@ -11,7 +11,9 @@ Fidelity rules (per AUDIT_FINDINGS.md §3.3 and DESIGN_DECISIONS.md):
 - ``input_schema`` must be **dict-equal** to the snapshot (the snapshot was stored
   with sorted keys for readable diffs; dict equality is order-independent and is the
   correct semantic oracle).
-- ``display_name``, ``description``, and ``http_methods`` strings must be byte-exact.
+- ``input_schema`` is compared **dict-equal** (order-insensitive); property and
+  ``required`` order are semantically inert in JSON Schema and not enforced here.
+- ``display_name``, ``description``, and ``http_methods`` strings must be exact.
 - ``min_version``/``max_version`` must be the raw spec strings (``'1.0'``,
   ``'99.99.99'``) — not normalized to ``'1.0.0'``.
 """

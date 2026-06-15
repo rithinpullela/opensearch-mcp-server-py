@@ -248,3 +248,30 @@ boundary assertion in test_tool_executor.py to assert CallToolResult/isError; th
 assertions test log_tool_error/tool functions directly (the tool→executor soft-dict contract is
 preserved) and are untouched.
 Gate: 623 passed, ruff clean; live check confirms wire isError=True + exact text preserved.
+
+## D17 — Adversarial review #4 fixes (PROCEED-WITH-FIXES: 0 blockers, no correctness defects)
+Review #4 was the strongest checkpoint: 0 blockers, every prior debt confirmed retired, the isError
+fix (O1) verified empirically correct against the installed SDK. The 3 MAJORs were abstraction-tax /
+oracle-honesty trims; fixed:
+- **Manifest models all 5 groups:** the 4 generated tools were smuggled into the `core` kwarg via
+  `{**core, **generated}` in tools.py while GROUP_ORDER listed only 4 groups (doc contradiction).
+  Added a `generated` entry to GROUP_ORDER + a `generated=` kwarg to compose_registry; tools.py now
+  passes build_generated_tools() as its own group. The manifest is now the single source of order
+  truth. Registry still byte-identical (48, exact tail order).
+- **Golden oracle honesty:** softened the "byte-for-byte / byte-locked" claims in schema.py + the
+  golden test docstring to "dict-equal (order-insensitive)" — the snapshot is sorted+dict-compared,
+  so property/`required` order is semantically inert and not enforced (hand-matched to the generator
+  but not oracle-pinned). No over-claim left.
+- **test_registry.py added:** the fail-loud DuplicateToolError + required-key validation (the
+  registry's one production value-add) was untested (fired only incidentally at import on
+  collision-free inputs). 12 direct tests: dup raises, missing-required raises (incl. http_methods),
+  insertion order, as_dict is a plain-dict copy.
+- **Import-time fail-fast contract DOCUMENTED** (review QUESTION): tools.py:_build_tool_registry
+  docstring now states the build runs at import deliberately (dup/invalid spec raises here, not at
+  first call) and warns against making it lazy.
+Kept ToolRegistry as-is (not collapsed) — its compose-time dup detection + the frozen-order test
+depend on it; collapsing would be churn for no gain now that it's tested.
+MINORs deferred (documented, non-correctness): required-order normalization note, version-cache
+unbounded-by-design + TTL-staleness CHANGELOG sentence, connection success-path buffering docstring,
+generated/ file count. These are O-list/docstring polish, tracked.
+Gate: 635 passed, ruff clean.

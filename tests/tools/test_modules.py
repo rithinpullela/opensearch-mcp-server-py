@@ -106,12 +106,12 @@ def _composed(memory_enabled: bool):
         importlib.reload(modules_mod)
 
         generated = build_generated_tools(version_check=tools_mod.check_tool_compatibility)
-        core = {**core_mod.build_core_tools(), **generated}
         composed = modules_mod.compose_registry(
             skills=skills_mod.SKILLS_TOOLS_REGISTRY,
             agentic_memory=agentic_mod.AGENTIC_MEMORY_TOOLS_REGISTRY,
             memory=memory_mod.MEMORY_TOOLS_REGISTRY,
-            core=core,
+            core=core_mod.build_core_tools(),
+            generated=generated,
         )
         return composed
 

@@ -9,7 +9,7 @@ Background
 be synthesized at boot by fetching the OpenSearch OpenAPI spec from GitHub
 (``tool_generator.py``). That runtime network fetch is being removed; these four
 tools become static. Their ``input_schema`` dicts must reproduce what the
-generator produced **byte-for-byte**, because the schema is part of the wire
+generator produced (**semantically** — dict-equal, see fidelity note), because the schema is part of the wire
 contract and is locked by a golden snapshot
 (``tests/fixtures/generated_tools_golden.json``).
 
@@ -26,8 +26,13 @@ tool-specific properties with the same shapes the generator emitted:
   (note: **no** ``type`` key — matching the generator, which omitted it for the
   body parameter)
 
-``tests/tools/domains/test_generated_tools_golden.py`` asserts byte-equality against
-the captured snapshot, so any drift fails loudly.
+Fidelity scope: ``tests/tools/domains/test_generated_tools_golden.py`` asserts the
+``input_schema`` is **dict-equal** (order-insensitive) to the captured snapshot, and
+that ``display_name`` / ``description`` / ``http_methods`` / versions match exactly. The
+property *insertion order* here is hand-matched to the generator's (base props, then
+path params in URL order, then body last) but is NOT enforced by the oracle — JSON
+Schema treats object properties and ``required`` as unordered, so order is semantically
+inert. The snapshot was stored with sorted keys; do not read "byte-for-byte" into it.
 """
 
 from copy import deepcopy

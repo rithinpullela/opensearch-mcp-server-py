@@ -964,18 +964,23 @@ from .modules import compose_registry  # noqa: E402
 def _build_tool_registry() -> dict:
     """Compose the full tool catalog as a plain dict, in canonical group order.
 
-    Group order (legacy): skills -> agentic_memory -> memory -> core -> generated.
-    The 4 ex-generated tools are folded into the `core` group's tail so they keep
-    their exact legacy position (after ListClustersTool). ``version_check`` is
-    injected into the generated tools' handlers exactly as before.
+    Group order (legacy): skills -> agentic_memory -> memory -> core -> generated,
+    modeled explicitly by ``modules.GROUP_ORDER`` (the generated tools are their own
+    group, not smuggled into core, so the manifest is the single source of order
+    truth). ``version_check`` is injected into the generated tools' handlers as before.
+
+    Returned as a plain dict via ``.as_dict()`` because ``config.apply_custom_tool_config``
+    calls ``.update()`` on it and ``tool_filter`` calls ``.pop()`` — a ``ToolRegistry``
+    would reject re-adds / lack ``.pop``. Built at import (fail-fast: a duplicate or
+    invalid spec raises here rather than at first tool call — do not make this lazy
+    without preserving that duplicate detection).
     """
-    generated = build_generated_tools(version_check=check_tool_compatibility)
-    core = {**build_core_tools(), **generated}
     return compose_registry(
         skills=SKILLS_TOOLS_REGISTRY,
         agentic_memory=AGENTIC_MEMORY_TOOLS_REGISTRY,
         memory=MEMORY_TOOLS_REGISTRY,
-        core=core,
+        core=build_core_tools(),
+        generated=build_generated_tools(version_check=check_tool_compatibility),
     ).as_dict()
 
 

@@ -37,15 +37,17 @@ Later phases replace each ``dict`` sub-registry with a per-domain
 from typing import Any, Mapping
 
 
-# The canonical group order, matching the legacy ``**``-spread in tools.py:
-#   skills -> agentic_memory -> memory -> (inline core/cat/search-relevance)
-# Each entry is (group_name, "how to source it"). The inline group is sourced
-# from tools.TOOL_REGISTRY minus the three sub-registries, preserving its order.
+# The canonical group order, matching the legacy ``**``-spread + boot-time append in
+# tools.py: skills -> agentic_memory -> memory -> core (inline block) -> generated
+# (the 4 ex-OpenAPI tools, appended last). This tuple is the single source of order
+# truth — every group the catalog contains is modeled here (no group is smuggled into
+# another). ``tools/list`` order is pinned by tests/tools/test_modules.py.
 GROUP_ORDER: tuple[str, ...] = (
     'skills',
     'agentic_memory',
     'memory',
     'core',  # core + cat + search-relevance + generic + list-clusters (legacy inline block)
+    'generated',  # the 4 static ex-OpenAPI tools (ClusterHealth, Count, Msearch, Explain)
 )
 
 
@@ -55,6 +57,7 @@ def compose_registry(
     agentic_memory: Mapping[str, Any],
     memory: Mapping[str, Any],
     core: Mapping[str, Any],
+    generated: Mapping[str, Any] | None = None,
 ):
     """Compose the full tool registry in canonical group order.
 
@@ -64,6 +67,8 @@ def compose_registry(
         memory: The memory tools sub-registry (3 tools; empty unless enabled).
         core: The inline core/cat/search-relevance/generic/list-clusters block,
             in its legacy declaration order.
+        generated: The 4 static ex-OpenAPI tools, appended last (the generator's
+            order). Optional/empty-allowed so the manifest is usable without them.
 
     Returns:
         ToolRegistry: An insertion-ordered registry equal key-for-key to the
@@ -78,6 +83,7 @@ def compose_registry(
         'agentic_memory': agentic_memory,
         'memory': memory,
         'core': core,
+        'generated': generated or {},
     }
     for group_name in GROUP_ORDER:
         registry.update(dict(groups[group_name]))
