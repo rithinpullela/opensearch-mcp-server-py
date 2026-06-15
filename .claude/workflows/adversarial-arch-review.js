@@ -29,7 +29,7 @@ const CONTEXT = [
   'fix real defects (per-call version round-trip, response-size memory safety, isError contract, etc).',
   'PRIME DIRECTIVE: no drift from observable behavior without a documented reason. ~525 unit tests + ~30',
   'integration tests are the 1:1 oracle.',
-  'Read these for grounding: REBUILD_MASTER_PLAN.md, AUDIT_FINDINGS.md, DESIGN_DECISIONS.md, ERROR_LOGGING_EVALUATION.md.',
+  'Read these for grounding (under docs/rebuild/): DECISION_LOG.md (authoritative — the shipped reality), AUDIT_FINDINGS.md, DESIGN_DECISIONS.md, ERROR_LOGGING_EVALUATION.md. NOTE: REBUILD_MASTER_PLAN.md / FASTMCP_REBUILD_*.md are PARTIALLY SUPERSEDED (see docs/rebuild/README.md) — DECISION_LOG.md + the code are authoritative.',
 ].join(' ')
 
 // ---------- Phase 1: survey ----------
@@ -137,7 +137,7 @@ phase('Synthesize')
 const synthesis = await agent(
   [
     'You are the lead adversarial reviewer writing a checkpoint entry to a RUNNING review log.',
-    'APPEND (do not overwrite) a new section to ' + REPO + '/ADVERSARIAL_REVIEW_LOG.md. If the file does not exist, create it with a top title first.',
+    'APPEND (do not overwrite) a new section to ' + REPO + '/docs/rebuild/ADVERSARIAL_REVIEW_LOG.md. If the file does not exist, create it with a top title first.',
     'Read the existing file first (if present) so you append below prior entries.',
     '',
     'This checkpoint: "' + checkpoint + '"  (diff ' + baseRef + '..' + headRef + ').',
