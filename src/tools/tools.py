@@ -1286,3 +1286,22 @@ TOOL_REGISTRY = {
         'multi_only': True,
     },
 }
+
+
+# The four tools below were previously synthesized at boot by fetching the OpenSearch
+# OpenAPI spec from GitHub (the now-removed tool_generator). They are static and
+# registered here, appended in the exact order the generator produced them
+# (ClusterHealth, Count, Msearch, Explain) so the advertised tools/list order is
+# unchanged. Their schemas/metadata are locked against a golden snapshot by
+# tests/tools/domains/test_generated_tools_golden.py.
+from .domains.generated.register import build_generated_tools  # noqa: E402
+
+
+def _register_generated_tools() -> None:
+    """Append the 4 static (ex-generated) tools to TOOL_REGISTRY in generator order."""
+    generated = build_generated_tools(version_check=check_tool_compatibility)
+    for name in ('ClusterHealthTool', 'CountTool', 'MsearchTool', 'ExplainTool'):
+        TOOL_REGISTRY[name] = generated[name]
+
+
+_register_generated_tools()

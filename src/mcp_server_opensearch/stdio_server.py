@@ -11,7 +11,6 @@ from mcp_server_opensearch.global_state import set_config_file_path, set_mode, s
 from mcp_server_opensearch.server_instructions import get_server_instructions
 from tools.config import apply_custom_tool_config
 from tools.tool_filter import get_tools
-from tools.tool_generator import generate_tools_from_openapi
 from tools.tools import TOOL_REGISTRY
 
 
@@ -41,8 +40,9 @@ async def serve(
     # Server instructions guide the LLM on dynamic connection params (single mode only)
     server = Server('opensearch-mcp-server', instructions=get_server_instructions())
 
-    # Call tool generator
-    await generate_tools_from_openapi()
+    # The 4 formerly-generated tools (Msearch/Explain/Count/ClusterHealth) are now
+    # static members of TOOL_REGISTRY (registered at import in tools.tools); no
+    # boot-time OpenAPI fetch is required.
     # Apply custom tool config (custom name and description)
     customized_registry = apply_custom_tool_config(
         TOOL_REGISTRY, config_file_path, cli_tool_overrides or {}

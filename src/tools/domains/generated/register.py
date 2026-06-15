@@ -27,27 +27,17 @@ from typing import Any, Awaitable, Callable, Optional
 _MIN_VERSION = '1.0'
 _MAX_VERSION = '99.99.99'
 
-
-def _descriptions() -> dict[str, str]:
-    """Return the per-tool description strings the generator emitted.
-
-    The generator used the description of the first endpoint in each operation
-    group. These are captured in the golden snapshot; sourced from there at build
-    time so they cannot drift.
-    """
-    import json
-    from pathlib import Path
-
-    # The snapshot lives under tests/fixtures; resolve relative to the repo root.
-    # We read descriptions from it so this module is the single place that needs the
-    # text, and the lock test guarantees they match.
-    fixture = Path(__file__).resolve()
-    for parent in fixture.parents:
-        candidate = parent / 'tests' / 'fixtures' / 'generated_tools_golden.json'
-        if candidate.exists():
-            data = json.loads(candidate.read_text())
-            return {k: v['description'] for k, v in data.items()}
-    raise FileNotFoundError('generated_tools_golden.json not found for descriptions')
+# Descriptions the generator emitted (the description of each operation group's first
+# endpoint in the OpenSearch API spec). Inlined here as the single source of truth;
+# the golden-snapshot test asserts they still match the captured generator output.
+_DESCRIPTIONS = {
+    'MsearchTool': 'Allows to execute several search operations in one request.',
+    'ExplainTool': (
+        "Returns information about why a specific document matches (or doesn't match) a query."
+    ),
+    'CountTool': 'Returns number of documents matching a query.',
+    'ClusterHealthTool': 'Returns basic information about the health of the cluster.',
+}
 
 
 def build_generated_tools(
@@ -67,7 +57,7 @@ def build_generated_tools(
     if version_check is None:
         from tools.tools import check_tool_compatibility as version_check
 
-    descriptions = _descriptions()
+    descriptions = _DESCRIPTIONS
 
     specs: dict[str, dict] = {}
 
