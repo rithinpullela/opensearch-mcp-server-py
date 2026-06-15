@@ -8,9 +8,13 @@ dependencies = [
     "aiohttp>=3.13.4",
     "boto3>=1.39.0",
     "idna>=3.15",
-    "mcp[cli]>=1.9.4",
+    # Pin below 2.0: the official SDK v2 renames FastMCP->MCPServer and changes
+    # low-level handler/return types (alpha as of mid-2026). >=1.25 gives stable
+    # Streamable HTTP + optional sessions. See MCP_V2_EXPLAINER.md / REBUILD_MASTER_PLAN.md.
+    "mcp[cli]>=1.25,<2",
     "opensearch-py==3.1.0",
     "pydantic>=2.11.3",
+    "pydantic-settings>=2.5.0",
     "pyyaml>=6.0.2",
     "requests>=2.33.0",
     "requests-aws4auth>=1.3.1",
