@@ -19,7 +19,7 @@ stay decoupled from the registry module.
 from . import handlers as _handlers
 from . import params as _params
 from . import schema as _schema
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable
 
 
 # Metadata captured from the live generator (golden snapshot). The version strings
@@ -40,72 +40,73 @@ _DESCRIPTIONS = {
 }
 
 
+# The single source of truth for generated-tool order. This is the exact order the
+# old runtime generator appended the tools to TOOL_REGISTRY: it iterated SPEC_FILES
+# = ['cluster.yaml', '_core.yaml'] and, within each, the spec's operation order —
+# yielding ClusterHealth (from cluster.yaml), then Count, Msearch, Explain (from
+# _core.yaml). Verified empirically against the live generator before deletion.
+# `tests/tools/domains/test_generated_tools_golden.py` and the registry tail-order
+# test pin this; do not reorder without updating those.
+GENERATED_TOOL_ORDER = ('ClusterHealthTool', 'CountTool', 'MsearchTool', 'ExplainTool')
+
+
 def build_generated_tools(
-    version_check: Optional[Callable[[str, Any], Awaitable[None]]] = None,
+    version_check: Callable[[str, Any], Awaitable[None]],
 ) -> dict[str, dict]:
-    """Build the 4 static generated-tool specs in canonical order.
+    """Build the 4 static generated-tool specs in the generator's exact order.
 
     Args:
-        version_check: The compatibility gate to inject into each handler. Defaults
-            to ``tools.check_tool_compatibility`` (the same callable the generated
-            ``tool_func`` used).
+        version_check: The compatibility gate injected into each handler — the same
+            callable the generated ``tool_func`` used
+            (``tools.check_tool_compatibility``). Required (no default) to avoid an
+            import cycle with ``tools.tools`` and an untested fallback branch.
 
     Returns:
-        An ordered ``dict`` mapping canonical tool name -> ToolSpec dict, for
-        ``Msearch``/``Explain``/``Count``/``ClusterHealth`` (the generator's order).
+        An ordered ``dict`` mapping canonical tool name -> ToolSpec, keyed in
+        :data:`GENERATED_TOOL_ORDER` (the order the old generator produced).
     """
-    if version_check is None:
-        from tools.tools import check_tool_compatibility as version_check
-
     descriptions = _DESCRIPTIONS
 
-    specs: dict[str, dict] = {}
+    # Per-tool spec pieces, assembled below in GENERATED_TOOL_ORDER.
+    pieces = {
+        'ClusterHealthTool': (
+            _schema.CLUSTER_HEALTH_SCHEMA,
+            _handlers.ENDPOINTS_CLUSTER_HEALTH,
+            _params.ClusterHealthArgs,
+            'GET',
+        ),
+        'CountTool': (
+            _schema.COUNT_SCHEMA,
+            _handlers.ENDPOINTS_COUNT,
+            _params.CountArgs,
+            'GET, POST',
+        ),
+        'MsearchTool': (
+            _schema.MSEARCH_SCHEMA,
+            _handlers.ENDPOINTS_MSEARCH,
+            _params.MsearchArgs,
+            'GET, POST',
+        ),
+        'ExplainTool': (
+            _schema.EXPLAIN_SCHEMA,
+            _handlers.ENDPOINTS_EXPLAIN,
+            _params.ExplainArgs,
+            'GET, POST',
+        ),
+    }
 
-    specs['MsearchTool'] = {
-        'display_name': 'MsearchTool',
-        'description': descriptions['MsearchTool'],
-        'input_schema': _schema.MSEARCH_SCHEMA,
-        'function': _handlers.make_handler(
-            'MsearchTool', _handlers.ENDPOINTS_MSEARCH, version_check
-        ),
-        'args_model': _params.MsearchArgs,
-        'min_version': _MIN_VERSION,
-        'max_version': _MAX_VERSION,
-        'http_methods': 'GET, POST',
-    }
-    specs['ExplainTool'] = {
-        'display_name': 'ExplainTool',
-        'description': descriptions['ExplainTool'],
-        'input_schema': _schema.EXPLAIN_SCHEMA,
-        'function': _handlers.make_handler(
-            'ExplainTool', _handlers.ENDPOINTS_EXPLAIN, version_check
-        ),
-        'args_model': _params.ExplainArgs,
-        'min_version': _MIN_VERSION,
-        'max_version': _MAX_VERSION,
-        'http_methods': 'GET, POST',
-    }
-    specs['CountTool'] = {
-        'display_name': 'CountTool',
-        'description': descriptions['CountTool'],
-        'input_schema': _schema.COUNT_SCHEMA,
-        'function': _handlers.make_handler('CountTool', _handlers.ENDPOINTS_COUNT, version_check),
-        'args_model': _params.CountArgs,
-        'min_version': _MIN_VERSION,
-        'max_version': _MAX_VERSION,
-        'http_methods': 'GET, POST',
-    }
-    specs['ClusterHealthTool'] = {
-        'display_name': 'ClusterHealthTool',
-        'description': descriptions['ClusterHealthTool'],
-        'input_schema': _schema.CLUSTER_HEALTH_SCHEMA,
-        'function': _handlers.make_handler(
-            'ClusterHealthTool', _handlers.ENDPOINTS_CLUSTER_HEALTH, version_check
-        ),
-        'args_model': _params.ClusterHealthArgs,
-        'min_version': _MIN_VERSION,
-        'max_version': _MAX_VERSION,
-        'http_methods': 'GET',
-    }
+    specs: dict[str, dict] = {}
+    for name in GENERATED_TOOL_ORDER:
+        input_schema, endpoints, args_model, http_methods = pieces[name]
+        specs[name] = {
+            'display_name': name,
+            'description': descriptions[name],
+            'input_schema': input_schema,
+            'function': _handlers.make_handler(name, endpoints, version_check),
+            'args_model': args_model,
+            'min_version': _MIN_VERSION,
+            'max_version': _MAX_VERSION,
+            'http_methods': http_methods,
+        }
 
     return specs

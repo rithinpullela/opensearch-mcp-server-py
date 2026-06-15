@@ -155,29 +155,34 @@ def test_int_field_reads_from_alias(clean_env, field, alias_value):
 
 @pytest.mark.parametrize('field,alias', sorted(TRUTHY_FLAG_FIELDS.items()))
 def test_truthy_flag_true_spellings(clean_env, field, alias):
-    """``true``/``1``/``yes`` (any case) parse to True for the shared-parser flags."""
-    for spelling in ('true', 'TRUE', 'True', '1', 'yes', 'YES', '  true  '):
+    """Only ``true`` (any case, trimmed) parses to True — matches live ``== 'true'``."""
+    for spelling in ('true', 'TRUE', 'True', '  true  '):
         clean_env.setenv(alias, spelling)
         assert getattr(Settings(), field) is True, (field, spelling)
 
 
 @pytest.mark.parametrize('field,alias', sorted(TRUTHY_FLAG_FIELDS.items()))
 def test_truthy_flag_false_spellings(clean_env, field, alias):
-    """``false``/``0``/``no`` and other values parse to False for the shared-parser flags."""
-    for spelling in ('false', 'FALSE', '0', 'no', 'off', ''):
+    """Everything other than ``"true"`` is False — including ``1``/``yes``.
+
+    This is the regression guard for the adversarial finding: widening the truthy
+    set to include ``"1"``/``"yes"`` would let a typo'd ``OPENSEARCH_NO_AUTH=1``
+    silently disable authentication. These flags must be EXACTLY ``lower()=='true'``.
+    """
+    for spelling in ('false', 'FALSE', '0', 'no', 'off', '', '1', 'yes', 'YES'):
         clean_env.setenv(alias, spelling)
         assert getattr(Settings(), field) is False, (field, spelling)
 
 
 def test_parse_bool_string_truthy():
-    """parse_bool_string accepts the union true/1/yes case-insensitively."""
-    for value in ('true', 'TRUE', 'True', '1', 'yes', 'YES', 'Yes', '  1  '):
+    """parse_bool_string accepts only the case-insensitive string 'true' (trimmed)."""
+    for value in ('true', 'TRUE', 'True', '  true  '):
         assert parse_bool_string(value) is True, value
 
 
 def test_parse_bool_string_falsy():
-    """parse_bool_string rejects everything outside the truthy union."""
-    for value in ('false', 'FALSE', '0', 'no', 'off', '', '2', 'enabled'):
+    """parse_bool_string rejects everything other than 'true' — incl. '1'/'yes'."""
+    for value in ('false', 'FALSE', '0', 'no', 'off', '', '2', 'enabled', '1', 'yes', 'YES'):
         assert parse_bool_string(value) is False, value
 
 

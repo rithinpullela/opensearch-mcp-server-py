@@ -20,11 +20,11 @@ def _legacy_and_composed(memory_enabled: bool):
     """
     env = {'MEMORY_TOOLS_ENABLED': 'true' if memory_enabled else 'false'}
     with mock.patch.dict(os.environ, env, clear=False):
-        import tools.skills_tools as skills_mod
-        import tools.memory_tools as memory_mod
         import tools.agentic_memory.actions as agentic_mod
-        import tools.tools as tools_mod
+        import tools.memory_tools as memory_mod
         import tools.modules as modules_mod
+        import tools.skills_tools as skills_mod
+        import tools.tools as tools_mod
 
         # Reload so the env-gated memory registry is recomputed for this case.
         importlib.reload(memory_mod)
@@ -71,3 +71,24 @@ class TestComposeRegistry:
         assert keys.index('CreateAgenticMemorySessionTool') > keys.index('LogPatternAnalysisTool')
         assert keys.index('SaveMemoryTool') > keys.index('SearchAgenticMemoryTool')
         assert keys.index('ListIndexTool') > keys.index('SaveMemoryTool')
+
+
+class TestGeneratedToolsRegistryOrder:
+    """Pin the observable tools/list tail order after the generator was made static.
+
+    The 4 ex-generated tools must appear LAST in TOOL_REGISTRY, in the exact order
+    the old runtime generator appended them, so the advertised tools/list order is
+    unchanged from before the generator was deleted.
+    """
+
+    def test_registry_tail_is_generated_tools_in_generator_order(self):
+        import tools.tools as tools_mod
+
+        expected_tail = ['ClusterHealthTool', 'CountTool', 'MsearchTool', 'ExplainTool']
+        assert list(tools_mod.TOOL_REGISTRY.keys())[-4:] == expected_tail
+
+    def test_registry_tail_matches_single_source_of_truth(self):
+        import tools.tools as tools_mod
+        from tools.domains.generated.register import GENERATED_TOOL_ORDER
+
+        assert list(tools_mod.TOOL_REGISTRY.keys())[-4:] == list(GENERATED_TOOL_ORDER)

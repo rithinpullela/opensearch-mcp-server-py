@@ -41,7 +41,11 @@ def built():
     return build_generated_tools(version_check=_noop)
 
 
-TOOL_NAMES = ['MsearchTool', 'ExplainTool', 'CountTool', 'ClusterHealthTool']
+# The true order the old runtime generator produced (cluster.yaml then _core.yaml
+# operation order): ClusterHealth, Count, Msearch, Explain. This is the wire-contract
+# order for tools/list; build_generated_tools keys its result in exactly this order.
+GENERATOR_ORDER = ['ClusterHealthTool', 'CountTool', 'MsearchTool', 'ExplainTool']
+TOOL_NAMES = GENERATOR_ORDER
 
 
 class TestGeneratedToolsGolden:
@@ -49,8 +53,12 @@ class TestGeneratedToolsGolden:
         assert set(built.keys()) == set(TOOL_NAMES)
 
     def test_order_matches_generator(self, built):
-        # Generator emitted them in this order; preserve it.
-        assert list(built.keys()) == TOOL_NAMES
+        # build_generated_tools must key its result in the generator's exact order.
+        assert list(built.keys()) == GENERATOR_ORDER
+        # and it must equal the module's single source of truth.
+        from tools.domains.generated.register import GENERATED_TOOL_ORDER
+
+        assert list(GENERATED_TOOL_ORDER) == GENERATOR_ORDER
 
     @pytest.mark.parametrize('name', TOOL_NAMES)
     def test_input_schema_dict_equal(self, name, built, golden):

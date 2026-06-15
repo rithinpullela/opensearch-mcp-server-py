@@ -10,10 +10,13 @@ on *every* tool invocation, in both single and multi mode) stops opening a fresh
 
 Design (see ``DESIGN_DECISIONS.md`` §1)
 --------------------------------------
-- A module-level ``dict`` is GIL-safe for get/set of whole entries; an
+- A module-level ``dict`` is GIL-safe for get/set of whole entries. A **per-key**
   :class:`asyncio.Lock` (NOT ``threading.RLock`` — the server is async) guards the
-  check-fetch-store critical section so concurrent callers do not stampede ``/``.
-  N concurrent calls collapse to one underlying fetch + N-1 cache reads.
+  check-fetch-store critical section, so N concurrent calls *for the same target*
+  collapse to one underlying fetch + N-1 cache reads, while calls for *different*
+  targets fetch concurrently (a slow/hung ``GET /`` for cluster A never blocks
+  version resolution for cluster B). A short meta-lock guards per-key lock creation
+  and is never held across a fetch.
 - The cache key is per connection target: in multi mode the cluster name; in
   single mode a *normalized* connection URL (lowercase host, explicit default
   port, no trailing slash, userinfo stripped) so that equivalent URLs share an
@@ -38,10 +41,30 @@ from typing import Optional
 from urllib.parse import urlparse, urlunparse
 
 
-# key -> (version, expiry_epoch); GIL-safe for whole-entry get/set, lock guards
-# the check-fetch-store critical section.
+# key -> (version, expiry_epoch); GIL-safe for whole-entry get/set.
 _CACHE: dict[str, tuple[Optional[Version], float]] = {}
-_LOCK = asyncio.Lock()
+
+# Per-key locks so the check-fetch-store critical section serializes only within a
+# single connection target. A slow/hung ``GET /`` for cluster A must NOT block
+# version resolution for cluster B in multi mode. ``_LOCKS_META`` is a short-held
+# meta-lock guarding creation/lookup of the per-key locks (never held across a fetch).
+_LOCKS: dict[str, asyncio.Lock] = {}
+_LOCKS_META = asyncio.Lock()
+
+
+async def _lock_for(key: str) -> asyncio.Lock:
+    """Return the per-key lock for ``key``, creating it under the meta-lock if needed.
+
+    The meta-lock is held only for the brief dict lookup/insert — never across the
+    awaited version fetch — so distinct keys never block one another.
+    """
+    async with _LOCKS_META:
+        lock = _LOCKS.get(key)
+        if lock is None:
+            lock = asyncio.Lock()
+            _LOCKS[key] = lock
+        return lock
+
 
 # Default TTL (seconds) when the env var is unset/invalid.
 _DEFAULT_TTL_SECS = 600.0
@@ -171,12 +194,20 @@ async def get_cached_version(
 
     key = make_cache_key(args, mode)
 
-    async with _LOCK:
+    # Fast path: a fresh entry needs no lock at all (dict get is GIL-safe).
+    cached = _CACHE.get(key)
+    if cached is not None and clock() < cached[1]:
+        return cached[0]
+
+    # Slow path: serialize per-key so callers for the SAME target collapse to one
+    # fetch, while DIFFERENT targets proceed concurrently.
+    lock = await _lock_for(key)
+    async with lock:
+        # Double-check: another caller for this key may have populated it while we
+        # waited for the lock.
         cached = _CACHE.get(key)
-        if cached is not None:
-            version, expiry = cached
-            if clock() < expiry:
-                return version
+        if cached is not None and clock() < cached[1]:
+            return cached[0]
 
         version = await fetch()
         entry_ttl = ttl if version is not None else min(ttl, _NEGATIVE_TTL_FLOOR_SECS)
@@ -185,9 +216,10 @@ async def get_cached_version(
 
 
 def clear_cache() -> None:
-    """Clear all cached entries.
+    """Clear all cached entries (and per-key locks).
 
     Test hook (and a seam for a future SIGHUP-driven refresh). Safe to call
     between tests to force a fresh fetch on the next lookup.
     """
     _CACHE.clear()
+    _LOCKS.clear()

@@ -127,6 +127,47 @@ async def test_concurrent_gather_one_fetch():
 
 
 @pytest.mark.asyncio
+async def test_slow_fetch_for_one_target_does_not_block_another():
+    """A hung fetch for cluster A must NOT block version resolution for cluster B.
+
+    Regression test for the per-key-lock fix (the prior global lock serialized all
+    keys). We start a fetch for A that blocks on an Event, then resolve B; B must
+    complete while A is still pending. Uses a real awaitable that actually parks, so
+    this would FAIL under a single global lock held across the fetch.
+    """
+    import asyncio
+
+    a_started = asyncio.Event()
+    a_may_finish = asyncio.Event()
+
+    async def slow_fetch_a():
+        a_started.set()
+        await a_may_finish.wait()  # park until the test releases it
+        return Version.parse('2.0.0')
+
+    async def fast_fetch_b():
+        return Version.parse('3.0.0')
+
+    args_a = _multi_args('cluster-a')
+    args_b = _multi_args('cluster-b')
+
+    # Launch A; wait until its fetch is in-flight (lock for key A held).
+    task_a = asyncio.create_task(get_cached_version(args_a, slow_fetch_a, mode='multi'))
+    await asyncio.wait_for(a_started.wait(), timeout=1.0)
+
+    # B must resolve even though A's fetch is still parked.
+    result_b = await asyncio.wait_for(
+        get_cached_version(args_b, fast_fetch_b, mode='multi'), timeout=1.0
+    )
+    assert result_b == Version.parse('3.0.0')
+    assert not task_a.done()  # A is still blocked
+
+    # Release A and confirm it completes correctly.
+    a_may_finish.set()
+    assert await asyncio.wait_for(task_a, timeout=1.0) == Version.parse('2.0.0')
+
+
+@pytest.mark.asyncio
 async def test_none_cached_only_for_short_floor():
     clock = _Clock()
     fetch = _Counter(None)

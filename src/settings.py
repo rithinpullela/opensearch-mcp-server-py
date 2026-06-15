@@ -60,17 +60,18 @@ Logging / monitoring (``src/mcp_server_opensearch/logging_config.py``):
     - ``OPENSEARCH_MEMORY_MONITOR_INTERVAL`` -> opensearch_memory_monitor_interval (int, default 60)
 
 Truthy-parsing notes (preserved exactly so migration flips no flag):
-    The shared ``parse_bool_string`` validator accepts the **union** of every truthy
-    spelling observed in the current codebase: ``true`` / ``1`` / ``yes`` (case-insensitive,
-    surrounding whitespace stripped). Anything else is False.
+    The shared ``parse_bool_string`` validator reproduces the live semantic exactly:
+    a flag is truthy **only** when the value is the case-insensitive string ``"true"``
+    (surrounding whitespace stripped). ``"1"``/``"yes"``/anything else is False. We do
+    NOT widen the accepted set — widening would silently change behavior, and for the
+    auth flags a typo'd ``"1"`` must never disable authentication.
 
-    Per-variable, today's code parses as follows; the union parser is a strict superset
-    so no current input changes meaning:
+    Per-variable, today's code parses as follows; the validator matches each exactly:
     - ``OPENSEARCH_NO_AUTH``, ``AWS_OPENSEARCH_SERVERLESS``, ``OPENSEARCH_HEADER_AUTH``,
-      ``MEMORY_TOOLS_ENABLED``: ``value.lower() == 'true'`` (only ``"true"`` is truthy today).
+      ``MEMORY_TOOLS_ENABLED``: ``value.lower() == 'true'`` (only ``"true"`` is truthy).
     - ``OPENSEARCH_SETTINGS_ALLOW_WRITE``: ``value.lower() == 'true'`` but **defaults to True**
-      (``os.getenv(..., 'true')``), so an unset or any non-``"true"`` value other than the
-      default yields False; the default-when-unset is True.
+      (``os.getenv(..., 'true')``), so an unset value yields True; any value other than
+      ``"true"`` yields False.
     - ``OPENSEARCH_SSL_VERIFY``: ``value.lower() != 'false'`` with default ``'true'`` — i.e.
       True unless explicitly ``"false"``. This is an *inverted* spelling (only ``"false"`` is
       falsy). It is modeled as a plain bool with a dedicated validator that preserves this
@@ -89,31 +90,33 @@ from typing import Optional
 # ``src/tools/memory_tools.py`` so the unset behavior matches exactly.
 DEFAULT_MEMORY_INDEX_NAME = 'agent-memory'
 
-# The union of every truthy spelling observed across the current codebase.
-# Used by ``parse_bool_string``; documented per-variable in the module docstring.
-_TRUTHY_VALUES = frozenset({'true', '1', 'yes'})
-
 
 def parse_bool_string(value: object) -> bool:
-    """Parse a truthy string using the union of all current spellings.
+    """Parse a flag exactly as the current code does: ``value.lower() == 'true'``.
 
-    Accepts ``true`` / ``1`` / ``yes`` case-insensitively (with surrounding whitespace
-    stripped). Any other string is False. Non-string values are coerced via ``bool``.
+    Every flag this validator backs (``opensearch_no_auth``,
+    ``aws_opensearch_serverless``, ``opensearch_header_auth``, ``memory_tools_enabled``,
+    ``opensearch_settings_allow_write``) is parsed in the live codebase as
+    ``value.lower() == 'true'`` — so ONLY the case-insensitive string ``"true"`` is
+    truthy. We reproduce that exactly (no widening to ``"1"``/``"yes"``): widening
+    would be a silent behavior change, and for the auth flags a typo'd ``"1"`` must
+    NOT disable authentication.
 
-    This is the shared parser for every flag whose current code is
-    ``value.lower() == 'true'``; the accepted set is a strict superset of ``"true"``,
-    so no input that is truthy today becomes falsy (and vice versa).
+    Surrounding whitespace is stripped (the live code reads these via plain
+    ``os.getenv(name, 'false')`` without stripping, but a bool flag with stray
+    whitespace was never truthy before and still is not). Non-string values are
+    coerced via ``bool`` (covers a real ``True``/``False`` passed in tests/config).
 
     Args:
         value: The raw value to parse (typically a ``str`` from the environment).
 
     Returns:
-        bool: True when ``value`` is one of the accepted truthy spellings.
+        bool: True only when ``value`` is the case-insensitive string ``"true"``.
     """
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
-        return value.strip().lower() in _TRUTHY_VALUES
+        return value.strip().lower() == 'true'
     return bool(value)
 
 

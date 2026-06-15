@@ -1298,10 +1298,14 @@ from .domains.generated.register import build_generated_tools  # noqa: E402
 
 
 def _register_generated_tools() -> None:
-    """Append the 4 static (ex-generated) tools to TOOL_REGISTRY in generator order."""
-    generated = build_generated_tools(version_check=check_tool_compatibility)
-    for name in ('ClusterHealthTool', 'CountTool', 'MsearchTool', 'ExplainTool'):
-        TOOL_REGISTRY[name] = generated[name]
+    """Append the 4 static (ex-generated) tools to TOOL_REGISTRY.
+
+    build_generated_tools() returns them already keyed in the generator's exact
+    order (GENERATED_TOOL_ORDER), the single source of truth; we preserve that
+    insertion order so the advertised tools/list order is unchanged.
+    """
+    for name, spec in build_generated_tools(version_check=check_tool_compatibility).items():
+        TOOL_REGISTRY[name] = spec
 
 
 _register_generated_tools()

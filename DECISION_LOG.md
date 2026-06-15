@@ -69,3 +69,31 @@ before proceeding. **Artifact:** .claude/workflows/adversarial-arch-review.js.
 ## D9 — Final deliverable: HTML report via frontend-design skill (user-requested)
 **When:** after the rebuild is complete. Summarizes every change + rationale for fast review,
 assembled from this log + ADVERSARIAL_REVIEW_LOG.md + the commit trail.
+
+## D10 — Adversarial review #1 fixes (PROCEED-WITH-FIXES, 0 blockers, 8 majors)
+The first adversarial-review checkpoint (ADVERSARIAL_REVIEW_LOG.md, P0-P3) flagged 8 majors;
+fixed the correctness/fidelity ones immediately:
+- **#1 tool ordering (single source of truth):** `register.py` now builds the 4 tools keyed in
+  the TRUE generator order via `GENERATED_TOOL_ORDER = (ClusterHealth, Count, Msearch, Explain)`;
+  `tools.py` iterates that result (deleted the duplicate hard-coded tuple). Added a registry
+  tail-order test pinning `list(TOOL_REGISTRY.keys())[-4:]` — the actual tools/list wire contract.
+  Fixed the golden test that pinned the WRONG order.
+- **#2 settings truthy-union (fidelity/security):** `parse_bool_string` widened the truthy set to
+  `{true,1,yes}` for 5 flags that live code parses as exactly `lower()=='true'` — a typo'd
+  `OPENSEARCH_NO_AUTH=1` would have disabled auth. Reverted to exact `== 'true'`; fixed the false
+  docstring; updated tests to PIN `1`/`yes` → False as a regression guard.
+- **#3 version_cache global lock (concurrency):** one module-global asyncio.Lock held across the
+  awaited fetch caused cross-key head-of-line blocking (slow GET / for cluster A blocked B).
+  Switched to PER-KEY locks (dict of locks under a short meta-lock + double-checked locking + a
+  lock-free fast path). Added a real cross-key non-blocking test (awaitable parked fetch via Event)
+  replacing the tautological synchronous-counter one.
+- **#5 register.py unwired fallback (cycle risk):** made `version_check` a REQUIRED param (dropped
+  the `if None: from tools.tools import ...` fallback) — removes a dormant import-cycle footgun and
+  an untested branch. Sole caller + test already inject it.
+Gate: 687 passed, ruff clean, registry still 48 tools / correct tail / zero network.
+
+**Deferred majors (tracked, not yet actioned):** #4 (~1100 LOC unwired modules — addressed by
+WIRING them in their phase so they replace live code, the minimal-diff mandate; next up) and the
+MINORs (#6 import-time mutation doc, #7 tautological compose_registry test until domains land,
+#8 auth_strategy dead branch, modules.py indirection, 6-file generated package). The version_cache
+proportionality QUESTION + auth fail-secure CHANGELOG note are flagged for the maintainer.
