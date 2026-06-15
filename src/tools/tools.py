@@ -3,6 +3,7 @@
 
 import json
 from .agentic_memory.actions import AGENTIC_MEMORY_TOOLS_REGISTRY
+from .compat import check_tool_compatibility as _check_tool_compatibility
 from .generic_api_tool import GenericOpenSearchApiArgs, generic_opensearch_api_tool
 from .memory_tools import MEMORY_TOOLS_REGISTRY
 from .skills_tools import SKILLS_TOOLS_REGISTRY
@@ -44,7 +45,7 @@ from .tool_params import (
     SearchSearchConfigurationsArgs,
     baseToolArgs,
 )
-from .utils import format_json, is_tool_compatible
+from .utils import format_json
 from mcp_server_opensearch.clusters_information import cluster_registry
 from opensearch.helper import (
     convert_search_results_to_csv,
@@ -97,28 +98,18 @@ async def list_clusters_tool(args: ListClustersArgs) -> list[dict]:
 
 
 async def check_tool_compatibility(tool_name: str, args: baseToolArgs = None):
-    """Check if a tool is compatible with the current OpenSearch version."""
-    opensearch_version = await get_opensearch_version(args)
-    if not is_tool_compatible(opensearch_version, TOOL_REGISTRY[tool_name]):
-        tool_display_name = TOOL_REGISTRY[tool_name].get('display_name', tool_name)
-        min_version = TOOL_REGISTRY[tool_name].get('min_version', '')
-        max_version = TOOL_REGISTRY[tool_name].get('max_version', '')
+    """Check if a tool is compatible with the current OpenSearch version.
 
-        version_info = (
-            f'{min_version} to {max_version}'
-            if min_version and max_version
-            else f'{min_version} or later'
-            if min_version
-            else f'up to {max_version}'
-            if max_version
-            else None
-        )
-
-        error_message = f"Tool '{tool_display_name}' is not supported for this OpenSearch version (current version: {opensearch_version})."
-        if version_info:
-            error_message += f' Supported version: {version_info}.'
-
-        raise Exception(error_message)
+    Delegates to the cycle-free leaf module ``tools.compat``; the registry and the
+    version fetcher are injected so that module never imports the client/registry
+    directly. Behavior (message text, bare ``Exception`` on mismatch) is identical.
+    """
+    await _check_tool_compatibility(
+        tool_name,
+        registry=TOOL_REGISTRY,
+        version_fetcher=get_opensearch_version,
+        args=args,
+    )
 
 
 async def list_indices_tool(args: ListIndicesArgs) -> list[dict]:
