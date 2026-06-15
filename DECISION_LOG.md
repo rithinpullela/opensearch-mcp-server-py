@@ -169,3 +169,27 @@ Deferred (sequencing, not correctness): the ~600 LOC unwired scaffold (registry/
 settings) — to be wired-or-deleted in the domain-split phase, with UNWIRED banners meanwhile.
 MINORs (docstring wording, cache eviction, doc clutter) tracked for cleanup.
 Gate: 671 passed, ruff clean.
+
+## D14 — Monolith split (MIDDLE-PATH) + delete unwired scaffold (workflow-decided)
+**Fork:** how to handle the 1311-line tools.py monolith + the ~600 LOC unwired scaffold
+(registry/modules/context/settings). Resolved by a 3-analyst decision workflow → **MIDDLE-PATH**.
+- **WIRE registry.py + modules.py** (they finally earn their place): replaced the 343-line inline
+  TOOL_REGISTRY literal in tools.py with `compose_registry(...).as_dict()`. The inline tool METADATA
+  moved verbatim into `tools/domains/core.py` (CORE_TOOLS, 35 tools, exact legacy order); **handlers
+  did NOT move** (they stay in tools.py; core.py imports them) — so no git-blame reset and the review
+  surface is ~30 lines of wiring, not 1000 lines of relocated logic. tools.py: 1311→982 lines.
+- **CRITICAL constraint (caught by the workflow):** TOOL_REGISTRY MUST stay a plain dict —
+  config.py calls `.update()` and tool_filter.py calls `.pop()` on it (ToolRegistry lacks `.pop` and
+  would reject re-adds). So compose ends in `.as_dict()`; ZERO consumers changed.
+- **DELETE context.py + settings.py** (+ their tests): unwired, zero prod importers, and wiring them
+  would be hundreds of out-of-scope lines (replace global_state / ~30 env reads) — betraying the
+  minimal-diff mandate. Removed `pydantic-settings` dep (only settings.py used it) + refreshed lock.
+- **Strengthened test_modules.py:** was a tautology (sourced `core` from TOOL_REGISTRY itself); now
+  sources `core` from domains/core.py + pins a hand-FROZEN 47/48-tool key-order literal as a real
+  regression oracle (memory on/off), plus an independent-composition check and a core-objects-are-live
+  identity check.
+- **Why not FULL-SPLIT:** moving 35 handler bodies (~900 LOC) resets blame + balloons review to ~1270
+  lines for no cited defect (audit named the 343-line literal, not handler layout). **Why not
+  DELETE-ALL:** registry/modules wiring is cheap move-only work that kills the real P1 defect.
+Net ≈ -624 LOC overall. Gate: 617 passed (674 − 57 deleted settings/context tests), ruff clean,
+registry byte-identical (48 tools, exact order, plain dict, zero network).

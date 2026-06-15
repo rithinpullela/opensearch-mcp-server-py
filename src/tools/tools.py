@@ -4,7 +4,6 @@
 import json
 from .agentic_memory.actions import AGENTIC_MEMORY_TOOLS_REGISTRY
 from .compat import check_tool_compatibility as _check_tool_compatibility
-from .generic_api_tool import GenericOpenSearchApiArgs, generic_opensearch_api_tool
 from .memory_tools import MEMORY_TOOLS_REGISTRY
 from .skills_tools import SKILLS_TOOLS_REGISTRY
 from .tool_logging import log_tool_error
@@ -941,371 +940,43 @@ async def search_experiments_tool(args: SearchExperimentsArgs) -> list[dict]:
         return log_tool_error('SearchExperimentsTool', e, 'searching experiments')
 
 
-# Registry of available OpenSearch tools with their metadata
-TOOL_REGISTRY = {
-    **SKILLS_TOOLS_REGISTRY,
-    **AGENTIC_MEMORY_TOOLS_REGISTRY,
-    **MEMORY_TOOLS_REGISTRY,
-    'ListIndexTool': {
-        'display_name': 'ListIndexTool',
-        'description': 'Lists indices in the OpenSearch cluster. If an index name or pattern is specified, return only information about the provided index or index pattern. The include_detail flag controls output: if False, returns only index name(s); if True (default), returns full metadata.',
-        'input_schema': ListIndicesArgs.model_json_schema(),
-        'function': list_indices_tool,
-        'args_model': ListIndicesArgs,
-        'min_version': '1.0.0',
-        'http_methods': 'GET',
-    },
-    'IndexMappingTool': {
-        'display_name': 'IndexMappingTool',
-        'description': 'Retrieves index mapping and setting information for an index in OpenSearch',
-        'input_schema': GetIndexMappingArgs.model_json_schema(),
-        'function': get_index_mapping_tool,
-        'args_model': GetIndexMappingArgs,
-        'http_methods': 'GET',
-    },
-    'SearchIndexTool': {
-        'display_name': 'SearchIndexTool',
-        'description': 'Searches an index using a query written in query domain-specific language (DSL) in OpenSearch. PREREQUISITE: You need to know the mappings of the index before constructing queries.',
-        'input_schema': SearchIndexArgs.model_json_schema(),
-        'function': search_index_tool,
-        'args_model': SearchIndexArgs,
-        'http_methods': 'GET, POST',
-    },
-    'GetShardsTool': {
-        'display_name': 'GetShardsTool',
-        'description': 'Gets information about shards in OpenSearch',
-        'input_schema': GetShardsArgs.model_json_schema(),
-        'function': get_shards_tool,
-        'args_model': GetShardsArgs,
-        'http_methods': 'GET',
-    },
-    'GetClusterStateTool': {
-        'display_name': 'GetClusterStateTool',
-        'description': 'Gets the current state of the cluster including node information, index settings, and more. Can be filtered by specific metrics and indices.',
-        'input_schema': GetClusterStateArgs.model_json_schema(),
-        'function': get_cluster_state_tool,
-        'args_model': GetClusterStateArgs,
-        'min_version': '1.0.0',
-        'http_methods': 'GET',
-    },
-    'GetSegmentsTool': {
-        'display_name': 'GetSegmentsTool',
-        'description': 'Gets information about Lucene segments in indices, including memory usage, document counts, and segment sizes. Can be filtered by specific indices.',
-        'input_schema': GetSegmentsArgs.model_json_schema(),
-        'function': get_segments_tool,
-        'args_model': GetSegmentsArgs,
-        'min_version': '1.0.0',
-        'http_methods': 'GET',
-    },
-    'CatNodesTool': {
-        'display_name': 'CatNodesTool',
-        'description': 'Lists node-level information, including node roles and load metrics. Gets information about nodes metrics in the OpenSearch cluster, including system metrics pid, name, cluster_manager, ip, port, version, build, jdk, along with disk, heap, ram, and file_desc. Can be filtered to specific metrics.',
-        'input_schema': CatNodesArgs.model_json_schema(),
-        'function': cat_nodes_tool,
-        'args_model': CatNodesArgs,
-        'min_version': '1.0.0',
-        'http_methods': 'GET',
-    },
-    'GetIndexInfoTool': {
-        'display_name': 'GetIndexInfoTool',
-        'description': 'Gets detailed information about an index including mappings, settings, and aliases. Supports wildcards in index names.',
-        'input_schema': GetIndexInfoArgs.model_json_schema(),
-        'function': get_index_info_tool,
-        'args_model': GetIndexInfoArgs,
-        'min_version': '1.0.0',
-        'http_methods': 'GET',
-    },
-    'GetIndexStatsTool': {
-        'display_name': 'GetIndexStatsTool',
-        'description': 'Gets statistics about an index including document count, store size, indexing and search performance metrics. Can be filtered to specific metrics.',
-        'input_schema': GetIndexStatsArgs.model_json_schema(),
-        'function': get_index_stats_tool,
-        'args_model': GetIndexStatsArgs,
-        'min_version': '1.0.0',
-        'http_methods': 'GET',
-    },
-    'GetQueryInsightsTool': {
-        'display_name': 'GetQueryInsightsTool',
-        'description': 'Gets query insights from the /_insights/top_queries endpoint, showing information about query patterns and performance.',
-        'input_schema': GetQueryInsightsArgs.model_json_schema(),
-        'function': get_query_insights_tool,
-        'args_model': GetQueryInsightsArgs,
-        'min_version': '2.12.0',  # Query insights feature requires OpenSearch 2.12+
-        'http_methods': 'GET',
-    },
-    'GetNodesHotThreadsTool': {
-        'display_name': 'GetNodesHotThreadsTool',
-        'description': 'Gets information about hot threads in the cluster nodes from the /_nodes/hot_threads endpoint.',
-        'input_schema': GetNodesHotThreadsArgs.model_json_schema(),
-        'function': get_nodes_hot_threads_tool,
-        'args_model': GetNodesHotThreadsArgs,
-        'min_version': '1.0.0',
-        'http_methods': 'GET',
-    },
-    'GetAllocationTool': {
-        'display_name': 'GetAllocationTool',
-        'description': 'Gets information about shard allocation across nodes in the cluster from the /_cat/allocation endpoint.',
-        'input_schema': GetAllocationArgs.model_json_schema(),
-        'function': get_allocation_tool,
-        'args_model': GetAllocationArgs,
-        'min_version': '1.0.0',
-        'http_methods': 'GET',
-    },
-    'GetLongRunningTasksTool': {
-        'display_name': 'GetLongRunningTasksTool',
-        'description': 'Gets information about long-running tasks in the cluster, sorted by running time in descending order.',
-        'input_schema': GetLongRunningTasksArgs.model_json_schema(),
-        'function': get_long_running_tasks_tool,
-        'args_model': GetLongRunningTasksArgs,
-        'min_version': '1.0.0',
-        'http_methods': 'GET',
-    },
-    'GetNodesTool': {
-        'display_name': 'GetNodesTool',
-        'description': 'Gets detailed information about nodes in the OpenSearch cluster, including static information like host system details, JVM info, processor type, node settings, thread pools, installed plugins, and more. Can be filtered by specific nodes and metrics.',
-        'input_schema': GetNodesArgs.model_json_schema(),
-        'function': get_nodes_tool,
-        'args_model': GetNodesArgs,
-        'min_version': '1.0.0',
-        'http_methods': 'GET',
-    },
-    'GetQuerySetTool': {
-        'display_name': 'GetQuerySetTool',
-        'description': 'Retrieves a specific query set by ID from the OpenSearch Search Relevance plugin. Query sets are collections of search queries used for relevance testing and evaluation.',
-        'input_schema': GetQuerySetArgs.model_json_schema(),
-        'function': get_query_set_tool,
-        'args_model': GetQuerySetArgs,
-        'min_version': '3.1.0',
-        'http_methods': 'GET',
-    },
-    'CreateQuerySetTool': {
-        'display_name': 'CreateQuerySetTool',
-        'description': 'Creates a new query set in the OpenSearch Search Relevance plugin by providing a list of queries. Query sets are used for relevance testing and evaluation.',
-        'input_schema': CreateQuerySetArgs.model_json_schema(),
-        'function': create_query_set_tool,
-        'args_model': CreateQuerySetArgs,
-        'min_version': '3.1.0',
-        'http_methods': 'PUT',
-    },
-    'SampleQuerySetTool': {
-        'display_name': 'SampleQuerySetTool',
-        'description': 'Creates a query set by sampling the top N most frequent queries from user behavior data (UBI indices) in the OpenSearch Search Relevance plugin.',
-        'input_schema': SampleQuerySetArgs.model_json_schema(),
-        'function': sample_query_set_tool,
-        'args_model': SampleQuerySetArgs,
-        'min_version': '3.1.0',
-        'http_methods': 'POST',
-    },
-    'DeleteQuerySetTool': {
-        'display_name': 'DeleteQuerySetTool',
-        'description': 'Deletes a query set by ID from the OpenSearch Search Relevance plugin.',
-        'input_schema': DeleteQuerySetArgs.model_json_schema(),
-        'function': delete_query_set_tool,
-        'args_model': DeleteQuerySetArgs,
-        'min_version': '3.1.0',
-        'http_methods': 'DELETE',
-    },
-    'GetExperimentTool': {
-        'display_name': 'GetExperimentTool',
-        'description': 'Retrieves a search relevance experiment by ID from the OpenSearch Search Relevance plugin.',
-        'input_schema': GetExperimentArgs.model_json_schema(),
-        'function': get_experiment_tool,
-        'args_model': GetExperimentArgs,
-        'min_version': '3.1.0',
-        'http_methods': 'GET',
-    },
-    'CreateExperimentTool': {
-        'display_name': 'CreateExperimentTool',
-        'description': (
-            'Creates a search relevance experiment using the OpenSearch Search Relevance plugin. '
-            'Supports three experiment types: '
-            'PAIRWISE_COMPARISON (compares 2 search configurations head-to-head), '
-            'POINTWISE_EVALUATION (evaluates 1 configuration against judgment lists), '
-            'HYBRID_OPTIMIZER (optimizes 1 configuration using judgment lists).'
-        ),
-        'input_schema': CreateExperimentArgs.model_json_schema(),
-        'function': create_experiment_tool,
-        'args_model': CreateExperimentArgs,
-        'min_version': '3.1.0',
-        'http_methods': 'PUT',
-    },
-    'DeleteExperimentTool': {
-        'display_name': 'DeleteExperimentTool',
-        'description': 'Deletes a search relevance experiment by ID from the OpenSearch Search Relevance plugin.',
-        'input_schema': DeleteExperimentArgs.model_json_schema(),
-        'function': delete_experiment_tool,
-        'args_model': DeleteExperimentArgs,
-        'min_version': '3.1.0',
-        'http_methods': 'DELETE',
-    },
-    'SearchQuerySetsTool': {
-        'display_name': 'SearchQuerySetsTool',
-        'description': (
-            'Searches query sets in the OpenSearch Search Relevance plugin using OpenSearch query DSL.'
-            'Accepts a full query DSL body to filter, sort, and paginate results. '
-            'Returns all query sets when called without a query body.'
-        ),
-        'input_schema': SearchQuerySetsArgs.model_json_schema(),
-        'function': search_query_sets_tool,
-        'args_model': SearchQuerySetsArgs,
-        'min_version': '3.5.0',
-        'http_methods': 'GET, POST',
-    },
-    'SearchSearchConfigurationsTool': {
-        'display_name': 'SearchSearchConfigurationsTool',
-        'description': (
-            'Searches search configurations in the OpenSearch Search Relevance plugin using OpenSearch query DSL.'
-            'Accepts a full query DSL body to filter, sort, and paginate results. '
-            'Returns all search configurations when called without a query body.'
-        ),
-        'input_schema': SearchSearchConfigurationsArgs.model_json_schema(),
-        'function': search_search_configurations_tool,
-        'args_model': SearchSearchConfigurationsArgs,
-        'min_version': '3.5.0',
-        'http_methods': 'GET, POST',
-    },
-    'SearchJudgmentsTool': {
-        'display_name': 'SearchJudgmentsTool',
-        'description': (
-            'Searches judgments in the OpenSearch Search Relevance plugin using OpenSearch query DSL.'
-            'Accepts a full query DSL body to filter, sort, and paginate results. '
-            'Returns all judgments when called without a query body.'
-        ),
-        'input_schema': SearchJudgmentsArgs.model_json_schema(),
-        'function': search_judgments_tool,
-        'args_model': SearchJudgmentsArgs,
-        'min_version': '3.5.0',
-        'http_methods': 'GET, POST',
-    },
-    'SearchExperimentsTool': {
-        'display_name': 'SearchExperimentsTool',
-        'description': (
-            'Searches experiments in the OpenSearch Search Relevance plugin using OpenSearch query DSL.'
-            'Accepts a full query DSL body to filter, sort, and paginate results. '
-            'Returns all experiments when called without a query body.'
-        ),
-        'input_schema': SearchExperimentsArgs.model_json_schema(),
-        'function': search_experiments_tool,
-        'args_model': SearchExperimentsArgs,
-        'min_version': '3.5.0',
-        'http_methods': 'GET, POST',
-    },
-    'GenericOpenSearchApiTool': {
-        'display_name': 'GenericOpenSearchApiTool',
-        'description': "A flexible tool for calling any OpenSearch API endpoint. Supports all HTTP methods with custom paths, query parameters, request bodies, and headers. Use this when you need to access OpenSearch APIs that don't have dedicated tools, or when you need more control over the request. Leverages your knowledge of OpenSearch API documentation to construct appropriate requests.",
-        'input_schema': GenericOpenSearchApiArgs.model_json_schema(),
-        'function': generic_opensearch_api_tool,
-        'args_model': GenericOpenSearchApiArgs,
-        'min_version': '1.0.0',
-        'http_methods': 'GET, POST, PUT, DELETE, HEAD, PATCH',
-    },
-    'CreateSearchConfigurationTool': {
-        'display_name': 'CreateSearchConfigurationTool',
-        'description': 'Creates a new search configuration in OpenSearch using the Search Relevance plugin. '
-        'The query must be an OpenSearch DSL JSON string with %SearchText% as the search placeholder.',
-        'input_schema': CreateSearchConfigurationArgs.model_json_schema(),
-        'function': create_search_configuration_tool,
-        'args_model': CreateSearchConfigurationArgs,
-        'min_version': '3.1.0',
-        'http_methods': 'PUT',
-    },
-    'GetSearchConfigurationTool': {
-        'display_name': 'GetSearchConfigurationTool',
-        'description': 'Retrieves a specific search configuration by ID from OpenSearch using the Search Relevance plugin.',
-        'input_schema': GetSearchConfigurationArgs.model_json_schema(),
-        'function': get_search_configuration_tool,
-        'args_model': GetSearchConfigurationArgs,
-        'min_version': '3.1.0',
-        'http_methods': 'GET',
-    },
-    'DeleteSearchConfigurationTool': {
-        'display_name': 'DeleteSearchConfigurationTool',
-        'description': 'Deletes a search configuration by ID from OpenSearch using the Search Relevance plugin.',
-        'input_schema': DeleteSearchConfigurationArgs.model_json_schema(),
-        'function': delete_search_configuration_tool,
-        'args_model': DeleteSearchConfigurationArgs,
-        'min_version': '3.1.0',
-        'http_methods': 'DELETE',
-    },
-    'GetJudgmentListTool': {
-        'display_name': 'GetJudgmentListTool',
-        'description': 'Retrieves a specific judgment list by ID from OpenSearch using the Search Relevance plugin.',
-        'input_schema': GetJudgmentListArgs.model_json_schema(),
-        'function': get_judgment_list_tool,
-        'args_model': GetJudgmentListArgs,
-        'min_version': '3.1.0',
-        'http_methods': 'GET',
-    },
-    'CreateJudgmentListTool': {
-        'display_name': 'CreateJudgmentListTool',
-        'description': 'Creates a judgment list with manual relevance ratings in OpenSearch using the Search Relevance plugin. '
-        'Accepts a JSON array of query-ratings objects with docId and numeric rating (0–3) per document.',
-        'input_schema': CreateJudgmentListArgs.model_json_schema(),
-        'function': create_judgment_list_tool,
-        'args_model': CreateJudgmentListArgs,
-        'min_version': '3.1.0',
-        'http_methods': 'PUT',
-    },
-    'CreateUBIJudgmentListTool': {
-        'display_name': 'CreateUBIJudgmentListTool',
-        'description': 'Creates a judgment list by mining relevance signals from User Behavior Insights (UBI) click data '
-        'stored in OpenSearch. Requires UBI indices to be populated.',
-        'input_schema': CreateUBIJudgmentListArgs.model_json_schema(),
-        'function': create_ubi_judgment_list_tool,
-        'args_model': CreateUBIJudgmentListArgs,
-        'min_version': '3.1.0',
-        'http_methods': 'PUT',
-    },
-    'DeleteJudgmentListTool': {
-        'display_name': 'DeleteJudgmentListTool',
-        'description': 'Deletes a judgment list by ID from OpenSearch using the Search Relevance plugin.',
-        'input_schema': DeleteJudgmentListArgs.model_json_schema(),
-        'function': delete_judgment_list_tool,
-        'args_model': DeleteJudgmentListArgs,
-        'min_version': '3.1.0',
-        'http_methods': 'DELETE',
-    },
-    'CreateLLMJudgmentListTool': {
-        'display_name': 'CreateLLMJudgmentListTool',
-        'description': 'Creates a judgment list using an LLM model configured in OpenSearch ML Commons. '
-        'For each query in the specified query set, the top k documents are retrieved via the search '
-        'configuration and rated by the LLM for relevance.',
-        'input_schema': CreateLLMJudgmentListArgs.model_json_schema(),
-        'function': create_llm_judgment_list_tool,
-        'args_model': CreateLLMJudgmentListArgs,
-        'min_version': '3.1.0',
-        'http_methods': 'PUT',
-    },
-    'ListClustersTool': {
-        'display_name': 'ListClustersTool',
-        'description': 'Lists all available OpenSearch clusters configured in the server. Returns the cluster names that can be used with other tools.',
-        'input_schema': ListClustersArgs.model_json_schema(),
-        'function': list_clusters_tool,
-        'args_model': ListClustersArgs,
-        'http_methods': 'GET',
-        'multi_only': True,
-    },
-}
-
-
-# The four tools below were previously synthesized at boot by fetching the OpenSearch
-# OpenAPI spec from GitHub (the now-removed tool_generator). They are static and
-# registered here, appended in the exact order the generator produced them
-# (ClusterHealth, Count, Msearch, Explain) so the advertised tools/list order is
-# unchanged. Their schemas/metadata are locked against a golden snapshot by
-# tests/tools/domains/test_generated_tools_golden.py.
+# Registry of available OpenSearch tools with their metadata.
+#
+# Assembled at import time from per-domain sources (skills / agentic-memory / memory
+# sub-registries + the inline `core` block in tools/domains/core.py + the 4 static
+# ex-generated tools), composed in the canonical group order by
+# `tools.modules.compose_registry`. This replaced a 343-line inline dict literal; the
+# handler functions remain in this module and are imported by the domain module(s).
+#
+# IMPORTANT: TOOL_REGISTRY must stay a PLAIN dict — `config.apply_custom_tool_config`
+# calls `.update()` on it and `tool_filter` calls `.pop()`; `ToolRegistry` would
+# reject re-adds / lack `.pop`. `compose_registry(...).as_dict()` returns a plain dict
+# (with fail-loud duplicate detection applied during composition). The composed order
+# (and the 4-tool generated tail) is pinned by tests/tools/test_modules.py.
+#
+# Imports are at the BOTTOM (after all handler defs) to avoid an import cycle:
+# domains/core.py imports the handler functions from this module.
+from .domains.core import CORE_TOOLS  # noqa: E402
 from .domains.generated.register import build_generated_tools  # noqa: E402
+from .modules import compose_registry  # noqa: E402
 
 
-def _register_generated_tools() -> None:
-    """Append the 4 static (ex-generated) tools to TOOL_REGISTRY.
+def _build_tool_registry() -> dict:
+    """Compose the full tool catalog as a plain dict, in canonical group order.
 
-    build_generated_tools() returns them already keyed in the generator's exact
-    order (GENERATED_TOOL_ORDER), the single source of truth; we preserve that
-    insertion order so the advertised tools/list order is unchanged.
+    Group order (legacy): skills -> agentic_memory -> memory -> core -> generated.
+    The 4 ex-generated tools are folded into the `core` group's tail so they keep
+    their exact legacy position (after ListClustersTool). ``version_check`` is
+    injected into the generated tools' handlers exactly as before.
     """
-    for name, spec in build_generated_tools(version_check=check_tool_compatibility).items():
-        TOOL_REGISTRY[name] = spec
+    generated = build_generated_tools(version_check=check_tool_compatibility)
+    core = {**CORE_TOOLS, **generated}
+    return compose_registry(
+        skills=SKILLS_TOOLS_REGISTRY,
+        agentic_memory=AGENTIC_MEMORY_TOOLS_REGISTRY,
+        memory=MEMORY_TOOLS_REGISTRY,
+        core=core,
+    ).as_dict()
 
 
-_register_generated_tools()
+TOOL_REGISTRY = _build_tool_registry()
