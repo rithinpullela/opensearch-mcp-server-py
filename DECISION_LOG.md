@@ -1,0 +1,71 @@
+# Rebuild Decision Log
+
+A running, append-only record of what was built, the design/code decisions made, and
+*why* — so the rebuild is auditable and the eventual HTML report can be assembled from
+a factual trail. Newest entries at the bottom.
+
+**Standing constraints (apply to every decision):**
+1. **Correctness first**, then maintainability, then latency/memory/efficiency.
+2. **Minimal diff / reviewer-friendliness** — do NOT heavily rewrite working code; prefer
+   surgical in-place edits over new abstractions unless a cited defect justifies it. A
+   reviewer must understand each change against the old code in <30s. Middle ground, not
+   a ground-up rewrite. (An adversarial `lens:minimal-diff` enforces this every checkpoint.)
+3. **No observable behavior drift** without a documented reason logged here.
+4. Each change is gated by the test suite (525-baseline unit + integration oracle) and ruff.
+
+---
+
+## D0 — Framework: stay on low-level `mcp.server.Server` (not high-level FastMCP)
+**Why:** the server does per-mode schema mutation the decorator API can't express; the
+official SDK v2 renames `FastMCP`→`MCPServer` (alpha; staying low-level immunizes us);
+zero new framework dependency on an official OpenSearch repo. Get the "clean" win from
+*modularization*, not framework swap. **Diff impact:** minimal — keeps the existing server
+shape. (See REBUILD_MASTER_PLAN.md §1, FASTMCP_REBUILD_DESIGN.md.)
+
+## D1 — Pin `mcp>=1.25,<2`; add `pydantic-settings`
+**Why:** avoid auto-upgrading into the breaking v2 alpha. **Commit:** 17e2d73.
+
+## D2 — Capture golden snapshot of the 4 generated tools before deleting the generator
+**Why:** the generator's schemas must be reproduced byte-for-byte; freeze them first as the
+fidelity oracle. **Artifact:** tests/fixtures/generated_tools_golden.json. **Commit:** 17e2d73.
+
+## D3 — Typed `ToolSpec` + `ToolRegistry` (additive, dict-compatible)
+**Why:** replace the implicit shape of the 344-line dict literal with a documented, typed,
+fail-loud (duplicate-key) registry — WITHOUT changing runtime shape (it still behaves as
+`dict[str, ToolSpec]`, so consumers are untouched). **Minimal-diff note:** read API mirrors
+dict so zero consumer changes. **Commit:** 027b495.
+
+## D4 — Extract `check_tool_compatibility` to leaf `compat.py`; `tools.py` delegates
+**Why:** breaks the real import cycle (tools→generic_api_tool→tool_filter→tools) that forced
+lazy in-function imports. Error message + bare-Exception behavior byte-identical. **Commit:** a56326b.
+
+## D5 — `compose_registry`/`modules.py` manifest + immutable `ServerContext` (additive)
+**Why:** make the legacy `**`-spread order explicit/testable; begin replacing global mutable
+state. **Minimal-diff note:** introduced additively; `global_state` stays source of truth
+until later phases migrate readers (no big-bang). **Commit:** a56326b.
+
+## D6 — version_cache / auth_strategy / settings modules (additive, UNWIRED)
+**Why:** prepared fixes for audit defects (per-call version round-trip, duplicated auth
+ladder, scattered config). Built + tested in isolation first; wired in later phases so each
+integration is independently gated. **Risk flagged for minimal-diff lens:** these are new
+modules not yet earning their place until wired — must verify they replace (not add to)
+existing code when integrated. **Commit:** 2f1d69d.
+
+## D7 — Static replacement of the 4 OpenAPI-generated tools + DELETE the generator
+**Why (cited defect, audit P0-1):** the runtime generator fetched the OpenAPI spec from an
+unpinned GitHub branch at boot — no timeout, 30s+ hang offline, `print()` to stdout
+corrupting the stdio JSON-RPC stream, swallowed errors silently dropping tools. The 4 tools
+are now static, registered at import in the generator's exact order, schemas byte-locked to
+the golden snapshot. **Proven:** registry builds with 48 tools and ZERO outbound network.
+**Behavior preserved:** tool names, order, schemas, GET-with-body, NDJSON, version gating.
+**Diff impact:** -317 (generator) / -7 generator tests; +~400 static tools+tests. Net removes
+a network dependency and a whole non-deterministic code path. **Commits:** 704b52d, f5b8719.
+
+## D8 — Standing adversarial review at every checkpoint (user-requested)
+**Why:** keep a zoomed-out, skeptical view of architecture/code/fidelity/simplicity AND
+minimal-diff/reviewer-friendliness. 5-lens workflow → ADVERSARIAL_REVIEW_LOG.md. Fix BLOCKERs
+before proceeding. **Artifact:** .claude/workflows/adversarial-arch-review.js.
+
+## D9 — Final deliverable: HTML report via frontend-design skill (user-requested)
+**When:** after the rebuild is complete. Summarizes every change + rationale for fast review,
+assembled from this log + ADVERSARIAL_REVIEW_LOG.md + the commit trail.
