@@ -4,13 +4,28 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+> This release includes an internal modular rebuild of the tool registry and connection
+> layer. Tool names, input schemas, output text, CLI flags, env vars, YAML keys, and HTTP
+> endpoints are unchanged. The behavior changes below are deliberate correctness/safety
+> fixes; each is called out for operators.
+
 ### Added
+- Add a per-connection-target OpenSearch version cache so the per-call version-compatibility gate no longer opens a fresh client and issues `GET /` on every tool invocation. TTL is configurable via `OPENSEARCH_VERSION_CACHE_TTL_SECS` (default 600s; `0` disables). The cache is bypassed when header-based auth is in effect (single- or multi-mode), since the target URL is then per-request.
+
+### Changed
+- Enforce the response-size limit **by default**: `OPENSEARCH_MAX_RESPONSE_SIZE` now defaults to 10 MiB (matching the documented default) instead of being unset/unlimited. Responses larger than the limit raise `ResponseSizeExceededError`, with the limit checked incrementally while streaming (it aborts before the whole body is buffered). Raise the env var, or the new per-call `max_response_size` override, for workloads that need larger responses.
+- Transport/connection errors from the size-limited connection now propagate as the standard opensearch-py exceptions (`ConnectionError` / `ConnectionTimeout` / `SSLError`) instead of being silently retried. The previous fallback path re-issued the request on any failure, which double-issued non-idempotent writes on a 4xx/5xx; that fallback has been removed.
+- Reject partial AWS header credentials: if an access key or secret key is provided without the full `{access_key, secret_key, region}` set, authentication now fails with `AuthenticationError` instead of silently falling through to the server's ambient AWS identity (privilege-confusion fix). Supplying `aws_region` alone is unaffected (it remains valid for IAM-role / ambient auth).
+- The four formerly OpenAPI-generated tools (`MsearchTool`, `ExplainTool`, `CountTool`, `ClusterHealthTool`) now validate their base connection arguments with their real types (e.g. `aws_opensearch_serverless: bool`, `opensearch_timeout: int`) like every other tool, instead of accepting only strings. Their input schemas, names, order, and request behavior are unchanged.
 
 ### Fixed
 - Fix MCP `isError` contract: tool-execution failures (OpenSearch connection errors, index_not_found, query-parse errors, version-gate failures, generic-API 4xx/5xx) now correctly set `CallToolResult.isError=true` on the wire per the MCP spec. Previously these were returned as successful results (`isError=false`) with the error only in a private `is_error` key, so spec-compliant clients/LLM agents could not distinguish a failed tool call from a success without string-matching the text. The error message text (`Error <operation>: <exception>`) is unchanged and still appears in `content[0].text`. Behavior change: clients that treated failed calls as success (isError=false) will now see isError=true; clients that branch on the response text are unaffected.
 - Fix Streamable HTTP `/mcp` endpoint issuing a 307 redirect to `/mcp/`, which broke strict proxies/clients that don't follow redirects mid-session. The bare `/mcp` path is now served directly via a `Route` ([#273](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/273))
+- Stop the size-limited connection from corrupting valid responses containing surrogate code points (decode now uses `('utf-8', 'surrogatepass')`, matching opensearch-py).
+- Log hygiene: scrub `user:pass@` userinfo from connection URLs before logging (CWE-532), move the IAM-role ARN log from INFO to DEBUG, and preserve the custom `User-Agent` header when bearer-token auth is used (it was previously dropped).
 
 ### Removed
+- Remove the runtime OpenAPI tool generator that fetched the OpenSearch API spec from GitHub at every server start. It had no timeout (a ~30s+ hang when offline), printed to stdout (corrupting the stdio JSON-RPC stream), and silently dropped tools on failure. The four tools it produced are now static, with identical names, schemas, versions, and request behavior (locked by a golden-snapshot test). Server startup no longer makes any network call to build the tool catalog. Pin updated to `mcp>=1.25,<2`.
 
 ## [Released 0.10.0]
 ### Added
