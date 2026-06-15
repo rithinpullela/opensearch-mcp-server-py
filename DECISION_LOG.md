@@ -97,3 +97,30 @@ WIRING them in their phase so they replace live code, the minimal-diff mandate; 
 MINORs (#6 import-time mutation doc, #7 tautological compose_registry test until domains land,
 #8 auth_strategy dead branch, modules.py indirection, 6-file generated package). The version_cache
 proportionality QUESTION + auth fail-secure CHANGELOG note are flagged for the maintainer.
+
+## D11 — Auth: SURGICAL in-place fix, DELETE unwired auth_strategy module (workflow-decided)
+**Fork:** wire in the 280-line auth_strategy.py vs surgical in-place fixes. Resolved by an
+adversarial decision workflow (2 analysts + judge). **Decision: SURGICAL-IN-PLACE.** Even the
+analyst assigned to argue FOR wiring concluded against it.
+**Why:** the audit's premise (a "duplicated 6-level auth ladder") is FALSE — the ladder exists
+exactly once in `_create_opensearch_client` and both single/multi mode funnel through it. With no
+duplication, the typed resolver earns nothing DRY-wise (YAGNI: one call site). resolve_auth_strategy
+is PURE (no I/O, no logging) so it could NOT delete the ~101-line apply ladder — wiring it would ADD
+a ~50-line dispatch layer on top (+~320 lines code+tests net) AND still need separate client.py edits
+for 2 of 3 log-hygiene fixes. Surgical path fixes the SAME defects for ~30x less diff.
+**Done (client.py +53/-9):**
+- O4 fail-secure guard: if explicit AWS key material (access_key or secret_key) is present without
+  the full {access_key, secret_key, region} triple → raise AuthenticationError (no silent fallthrough
+  to ambient identity). aws_region ALONE does NOT trigger it (it's the legit IAM/ambient path).
+- Bearer path MERGES the Authorization header into base headers (preserves custom User-Agent) instead
+  of replacing them.
+- IAM ARN log: INFO → DEBUG (account/role identifier kept out of INFO).
+- New `_scrub_url_userinfo()` applied at all URL log sinks (`_log_connection_event` + the 2 init INFO
+  lines) — strips `user:pass@` (CWE-532).
+- **Deleted** src/opensearch/auth_strategy.py (280) + tests/opensearch/test_auth_strategy.py (317) —
+  the unwired module that never earned its place (recoverable from git if a 2nd ladder ever appears).
+- Added 10 unit tests (5 fail-secure guard via _create_opensearch_client directly, 5 URL-scrub);
+  updated the bearer test to assert User-Agent is now preserved (it encoded the old clobber bug).
+**Observable changes (flag for maintainer, O4 + log hygiene):** partial AWS header creds now RAISE
+(CHANGELOG breaking note for partial-cred configs); IAM ARN no longer at INFO; bearer UA preserved.
+Gate: 660 passed, ruff clean. Net: ~600 fewer lines than wiring, same correctness.

@@ -143,6 +143,29 @@ async def get_opensearch_client(args: baseToolArgs) -> AsyncIterator[AsyncOpenSe
 
 
 # Private Implementation Functions
+def _scrub_url_userinfo(url: str) -> str:
+    """Return ``url`` with any ``user:pass@`` userinfo removed, for safe logging.
+
+    A connection URL may embed credentials (``https://user:pass@host:9200``). Those
+    must never reach logs (CWE-532). This strips the userinfo while leaving the rest
+    of the URL intact; unparseable input is returned unchanged (it contained no
+    parseable userinfo to leak).
+    """
+    if not url:
+        return url
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return url
+    if not parsed.hostname or (parsed.username is None and parsed.password is None):
+        return url
+    host_literal = f'[{parsed.hostname}]' if ':' in parsed.hostname else parsed.hostname
+    netloc = f'{host_literal}:{parsed.port}' if parsed.port is not None else host_literal
+    return urlunparse(
+        (parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment)
+    )
+
+
 def _netloc_with_explicit_port(parsed: ParseResult, port: int) -> str:
     host = parsed.hostname
     if not host:
@@ -186,7 +209,8 @@ def _log_connection_event(
             'auth_method': auth_method,
             'datasource_type': datasource_type,
             'status': 'error',
-            'opensearch_url': opensearch_url,
+            # Strip any embedded user:pass@ before logging (CWE-532).
+            'opensearch_url': _scrub_url_userinfo(opensearch_url),
             'error': error,
         },
     )
@@ -326,7 +350,10 @@ def _initialize_client_single_mode(args: baseToolArgs = None) -> AsyncOpenSearch
                     'OPENSEARCH_URL environment variable is required but not set'
                 )
 
-        logger.info(f'Initializing single mode OpenSearch client for URL: {opensearch_url}')
+        logger.info(
+            f'Initializing single mode OpenSearch client for URL: '
+            f'{_scrub_url_userinfo(opensearch_url)}'
+        )
 
         # Use common client creation function
         return _create_opensearch_client(
@@ -376,7 +403,8 @@ def _initialize_client_multi_mode(cluster_info: ClusterInfo) -> AsyncOpenSearch:
         raise ConfigurationError('Cluster info cannot be None for multi mode')
     try:
         logger.info(
-            f'Initializing multi mode OpenSearch client for cluster: {cluster_info.opensearch_url}'
+            f'Initializing multi mode OpenSearch client for cluster: '
+            f'{_scrub_url_userinfo(cluster_info.opensearch_url)}'
         )
         # Extract parameters from cluster info
         opensearch_url = cluster_info.opensearch_url
@@ -616,7 +644,11 @@ def _create_opensearch_client(
         if bearer_auth_header:
             logger.info('[HEADER AUTH] Using Authorization Bearer header')
             try:
-                client_kwargs['headers'] = {'Authorization': bearer_auth_header}
+                # Merge (not replace) so the custom User-Agent header is preserved.
+                client_kwargs['headers'] = {
+                    **client_kwargs.get('headers', {}),
+                    'Authorization': bearer_auth_header,
+                }
                 return AsyncOpenSearch(**client_kwargs)
             except Exception as e:
                 _log_connection_event(
@@ -626,14 +658,25 @@ def _create_opensearch_client(
                     f'Failed to authenticate with Authorization Bearer header: {e}'
                 )
 
+        # Fail-secure: reject partial AWS header credentials. If explicit key
+        # material (access key or secret key) is supplied, the FULL header-AWS
+        # triple {access_key, secret_key, region} must be present — otherwise we
+        # would silently fall through to the server's ambient identity (privilege
+        # confusion, audit O4). Note: aws_region ALONE is legitimate (it is also
+        # used by IAM-role and ambient-credential auth), so it does not trigger
+        # this guard; only partial *key material* does.
+        if (aws_access_key_id or aws_secret_access_key) and not (
+            aws_access_key_id and aws_secret_access_key and aws_region and str(aws_region).strip()
+        ):
+            raise AuthenticationError(
+                'Incomplete AWS header credentials: aws_access_key_id, '
+                'aws_secret_access_key, and aws_region are required together.'
+            )
+
         # 3. Header-based AWS credentials authentication (highest priority when provided)
         if aws_access_key_id and aws_secret_access_key and aws_region:
             logger.info('[HEADER AUTH] Using AWS credentials from headers')
             try:
-                if not aws_region or (isinstance(aws_region, str) and not aws_region.strip()):
-                    raise AuthenticationError(
-                        'AWS region is required for header-based authentication'
-                    )
                 credentials = Credentials(
                     access_key=aws_access_key_id,
                     secret_key=aws_secret_access_key,
@@ -650,7 +693,8 @@ def _create_opensearch_client(
 
         # 4. IAM role authentication
         if iam_arn and iam_arn.strip():
-            logger.info(f'[IAM AUTH] Using IAM role authentication: {iam_arn}')
+            # ARN can identify an account/role; keep it out of INFO logs.
+            logger.debug(f'[IAM AUTH] Using IAM role authentication: {iam_arn}')
             try:
                 if not aws_region or (isinstance(aws_region, str) and not aws_region.strip()):
                     raise AuthenticationError('AWS region is required for IAM role authentication')
