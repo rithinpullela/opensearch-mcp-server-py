@@ -21,6 +21,23 @@ def _clear_version_cache():
     yield
 
 
+@pytest.fixture(autouse=True)
+def _reset_global_mode():
+    """Reset the process-global server mode after every test.
+
+    ``global_state`` holds the server mode as module-global state; several tests call
+    ``set_mode('multi')`` and do not reset it, which can leak into later tests that
+    assume the default ``'single'`` (e.g. the version-cache header-auth bypass, which
+    branches on ``get_mode()``). Restoring the prior value after each test keeps that
+    global isolated without changing production behavior.
+    """
+    from mcp_server_opensearch import global_state
+
+    saved = global_state._current_mode
+    yield
+    global_state._current_mode = saved
+
+
 def pytest_addoption(parser):
     parser.addoption(
         '--run-evals',

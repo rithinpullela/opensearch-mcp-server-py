@@ -956,7 +956,7 @@ async def search_experiments_tool(args: SearchExperimentsArgs) -> list[dict]:
 #
 # Imports are at the BOTTOM (after all handler defs) to avoid an import cycle:
 # domains/core.py imports the handler functions from this module.
-from .domains.core import CORE_TOOLS  # noqa: E402
+from .domains.core import build_core_tools  # noqa: E402
 from .domains.generated.register import build_generated_tools  # noqa: E402
 from .modules import compose_registry  # noqa: E402
 
@@ -970,7 +970,7 @@ def _build_tool_registry() -> dict:
     injected into the generated tools' handlers exactly as before.
     """
     generated = build_generated_tools(version_check=check_tool_compatibility)
-    core = {**CORE_TOOLS, **generated}
+    core = {**build_core_tools(), **generated}
     return compose_registry(
         skills=SKILLS_TOOLS_REGISTRY,
         agentic_memory=AGENTIC_MEMORY_TOOLS_REGISTRY,

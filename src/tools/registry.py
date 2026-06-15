@@ -62,8 +62,17 @@ class ToolSpec(TypedDict):
     max_size_limit: NotRequired[int]
 
 
-# Keys that must be present on every registered tool.
-_REQUIRED_KEYS = ('display_name', 'description', 'input_schema', 'function', 'args_model')
+# Keys that must be present on every registered tool. ``http_methods`` is included
+# because the write-protection filter substring-matches ``'GET'`` against it; a tool
+# missing it would be silently treated as a write tool, so requiring it closes that gap.
+_REQUIRED_KEYS = (
+    'display_name',
+    'description',
+    'input_schema',
+    'function',
+    'args_model',
+    'http_methods',
+)
 
 
 class DuplicateToolError(ValueError):

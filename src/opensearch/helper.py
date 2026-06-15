@@ -780,21 +780,40 @@ async def get_opensearch_version(args: baseToolArgs) -> Version:
     Returns:
         Version: The version of OpenSearch cluster (SemVer style), or ``None``.
     """
-    import os
     from .version_cache import get_cached_version
     from mcp_server_opensearch.global_state import get_mode
 
     # When header-based auth is active, the real target URL comes from the per-request
-    # ``opensearch-url`` header — which the cache key (built from env/args URL) cannot
-    # see. Two requests to physically different clusters via different headers would
-    # otherwise share one cache entry (cross-cluster version bleed). Bypass the cache
-    # in that mode and fetch directly, per request.
-    if os.getenv('OPENSEARCH_HEADER_AUTH', '').lower() == 'true':
+    # ``opensearch-url`` header — which the cache key (built from the env/args/cluster
+    # URL) cannot see. Two requests to physically different clusters via different
+    # headers would otherwise share one cache entry (cross-cluster version bleed), so
+    # bypass the cache and fetch per request whenever header auth is in effect.
+    #
+    # Single mode enables header auth via OPENSEARCH_HEADER_AUTH; multi mode enables it
+    # per-cluster via the cluster config's opensearch_header_auth flag.
+    mode = get_mode()
+    if _header_auth_active(args, mode):
         return await _fetch_opensearch_version(args)
 
-    return await get_cached_version(
-        args, fetch=lambda: _fetch_opensearch_version(args), mode=get_mode()
-    )
+    return await get_cached_version(args, fetch=lambda: _fetch_opensearch_version(args), mode=mode)
+
+
+def _header_auth_active(args: baseToolArgs, mode: str) -> bool:
+    """Return whether per-request header auth is in effect for this call.
+
+    Single mode: the ``OPENSEARCH_HEADER_AUTH`` env flag. Multi mode: the target
+    cluster's ``opensearch_header_auth`` config flag. When true the connection URL is
+    overridden by a per-request header, so the version cache must be bypassed.
+    """
+    import os
+
+    if mode == 'multi':
+        from mcp_server_opensearch.clusters_information import cluster_registry
+
+        cluster = cluster_registry.get(getattr(args, 'opensearch_cluster_name', '') or '')
+        return bool(getattr(cluster, 'opensearch_header_auth', None))
+
+    return os.getenv('OPENSEARCH_HEADER_AUTH', '').lower() == 'true'
 
 
 async def create_agentic_memory_session(

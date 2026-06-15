@@ -106,7 +106,7 @@ def _composed(memory_enabled: bool):
         importlib.reload(modules_mod)
 
         generated = build_generated_tools(version_check=tools_mod.check_tool_compatibility)
-        core = {**core_mod.CORE_TOOLS, **generated}
+        core = {**core_mod.build_core_tools(), **generated}
         composed = modules_mod.compose_registry(
             skills=skills_mod.SKILLS_TOOLS_REGISTRY,
             agentic_memory=agentic_mod.AGENTIC_MEMORY_TOOLS_REGISTRY,
@@ -177,7 +177,7 @@ class TestComposeRegistry:
         import tools.domains.core as core_mod
         import tools.tools as tools_mod
 
-        for key, spec in core_mod.CORE_TOOLS.items():
+        for key, spec in core_mod.build_core_tools().items():
             assert tools_mod.TOOL_REGISTRY[key] is spec, f'core spec object differs for {key}'
 
     def test_skills_first_then_agentic_then_memory(self):

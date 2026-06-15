@@ -100,10 +100,13 @@ MSEARCH_SCHEMA = _build_schema(
 
 EXPLAIN_SCHEMA = _build_schema(
     'ExplainArgs',
+    # Property insertion order matches the generator exactly: path params (index, id)
+    # in URL order, then body last. (Order is semantically insignificant in JSON
+    # Schema, but we preserve it so the schema is byte-faithful, not just dict-equal.)
     extra_properties={
-        'body': _body_param(_EXPLAIN_BODY_DESCRIPTION),
-        'id': _string_param('id'),
         'index': _string_param('index'),
+        'id': _string_param('id'),
+        'body': _body_param(_EXPLAIN_BODY_DESCRIPTION),
     },
     required=['body', 'id', 'index'],
 )

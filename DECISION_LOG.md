@@ -193,3 +193,36 @@ Gate: 671 passed, ruff clean.
   DELETE-ALL:** registry/modules wiring is cheap move-only work that kills the real P1 defect.
 Net ≈ -624 LOC overall. Gate: 617 passed (674 − 57 deleted settings/context tests), ruff clean,
 registry byte-identical (48 tools, exact order, plain dict, zero network).
+
+## D15 — Adversarial review #3 fixes (PROCEED-WITH-FIXES: 0 blockers, 3 majors)
+Review #3 confirmed the two prior debts (connection BLOCKER, ~600 LOC unwired scaffold) are
+genuinely resolved. Fixed its 3 MAJORs + 2 cheap MINORs:
+- **MAJOR tools.py↔core.py circular import:** core.py top-imported 35 handlers from tools.py while
+  tools.py imported CORE_TOOLS from core.py — core.py couldn't import standalone. Fixed by converting
+  CORE_TOOLS (module-level dict) into `build_core_tools()` with the handler/arg imports moved LAZILY
+  inside it (mirrors the generated/ pattern) + a module-level cache so it returns the same objects.
+  tools.py calls build_core_tools() at its bottom. Added test_core_importable.py (subprocess imports
+  core.py FIRST in a fresh interpreter → must not raise). Cycle verified broken.
+- **MAJOR params.py base-arg validation drift [OBSERVABLE O10]:** the deleted generator coerced ALL
+  base args to str; the static models inherit baseToolArgs' real types (bool/int/etc). This is MORE
+  correct (matches every other tool) but is an observable change for the 4 ex-generated tools — they
+  now type-validate base args instead of accepting only strings. Fixed the false "match EXACTLY"
+  docstring (now distinguishes tool-specific exact-match from base-arg deliberate-stricter), added
+  3 base-arg typing tests.
+- **MAJOR version_cache multi-mode header-auth bleed:** D13's bypass only checked the single-mode
+  OPENSEARCH_HEADER_AUTH env flag; multi mode enables header auth per-cluster via
+  cluster_info.opensearch_header_auth. Extracted `_header_auth_active(args, mode)` that checks the env
+  flag (single) or the target cluster's config flag (multi) and bypasses the cache either way. Added
+  2 multi-mode tests (header-auth cluster → bypass; fixed cluster → cached).
+- **MINOR http_methods now in _REQUIRED_KEYS** (write-protection filter substring-matches 'GET' on it
+  — a tool missing it would be silently treated as a write tool).
+- **MINOR ExplainTool input_schema property order** restored to generator insertion order
+  (index,id,body) so the schema is byte-faithful, not just dict-equal.
+- **Test isolation:** added a conftest autouse fixture resetting global_state mode after each test
+  (other files call set_mode('multi') and leak it; the new bypass branches on get_mode()).
+Gate: 623 passed, ruff clean, registry byte-identical (48, plain dict), core.py cycle-free.
+
+## O-list update
+O10 (NEW): the 4 ex-generated tools (Msearch/Explain/Count/ClusterHealth) now validate base
+connection args with their real baseToolArgs types instead of coercing all to str (more correct;
+aligns with every other tool). CHANGELOG-worthy, low risk.
