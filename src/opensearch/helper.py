@@ -780,8 +780,17 @@ async def get_opensearch_version(args: baseToolArgs) -> Version:
     Returns:
         Version: The version of OpenSearch cluster (SemVer style), or ``None``.
     """
+    import os
     from .version_cache import get_cached_version
     from mcp_server_opensearch.global_state import get_mode
+
+    # When header-based auth is active, the real target URL comes from the per-request
+    # ``opensearch-url`` header — which the cache key (built from env/args URL) cannot
+    # see. Two requests to physically different clusters via different headers would
+    # otherwise share one cache entry (cross-cluster version bleed). Bypass the cache
+    # in that mode and fetch directly, per request.
+    if os.getenv('OPENSEARCH_HEADER_AUTH', '').lower() == 'true':
+        return await _fetch_opensearch_version(args)
 
     return await get_cached_version(
         args, fetch=lambda: _fetch_opensearch_version(args), mode=get_mode()

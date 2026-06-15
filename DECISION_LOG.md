@@ -145,3 +145,27 @@ Audit P1-5/6/7/9 + DESIGN_DECISIONS §2. connection.py net -16 lines (deleted th
   added a real streaming early-abort test (proves abort at chunk 3 of 10 BEFORE buffering the whole
   body — the memory-safety guarantee the audit said was untested), fixed 4 client tests asserting the
   old None default. Gate: 661 passed, ruff clean.
+
+## D13 — Adversarial review #2 fixes (STOP-AND-FIX: 1 BLOCKER + 2 MAJORs)
+Review #2 verdict was STOP-AND-FIX. Fixed the correctness issues before proceeding:
+- **BLOCKER (connection.py UnboundLocalError):** the `except Exception` handler referenced
+  `start`/`url_path`/`orig_body` assigned INSIDE the try AFTER the failure points, so a
+  session/SSL setup failure (exactly what the handler translates) raised UnboundLocalError and
+  MASKED the real error. The early-abort test missed it (mocked a never-throwing session). Fix:
+  hoisted orig_body/url_path above the try; `start = time.monotonic()` (not self.loop.time — loop
+  is only set once the session exists, inside the try); switched the 3 duration clocks to
+  time.monotonic for consistency. Added test_session_creation_failure_raises_connection_error
+  (proves ConnectionError propagates, not UnboundLocalError).
+- **MAJOR (params.py validation drift):** my `Optional[str]=None` ACCEPTED explicit `index=None`
+  where the generator's `(str,None)` REJECTED it. Restored exact fidelity by rebuilding the 4 arg
+  models with `create_model(..., index=(str,None), body=(Any,None))` — index/id reject explicit
+  null, body accepts it, matching the generator byte-for-byte. Fixed the false "mirror" docstring.
+  Added test_generated_params.py (7 tests pinning the validation). No new observable change.
+- **MAJOR (version_cache header-auth key bleed):** when OPENSEARCH_HEADER_AUTH=true the real URL
+  comes from the per-request opensearch-url header, invisible to make_cache_key → cross-cluster
+  version bleed. Fix: get_opensearch_version BYPASSES the cache when header-auth is active (fetches
+  per request). Added 2 tests (header-auth → 2 fetches; non-header → 1 cached fetch).
+Deferred (sequencing, not correctness): the ~600 LOC unwired scaffold (registry/modules/context/
+settings) — to be wired-or-deleted in the domain-split phase, with UNWIRED banners meanwhile.
+MINORs (docstring wording, cache eviction, doc clutter) tracked for cleanup.
+Gate: 671 passed, ruff clean.

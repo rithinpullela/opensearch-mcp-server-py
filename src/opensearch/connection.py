@@ -8,6 +8,7 @@ OpenSearch connection classes with additional features like response size limiti
 """
 
 import logging
+import time
 from opensearchpy import AsyncHttpConnection
 
 
@@ -160,6 +161,17 @@ class BufferedAsyncHttpConnection(AsyncHttpConnection):
         )
         from urllib.parse import urlencode
 
+        # Hoisted above the try: so the except handler can always reference them, even
+        # if the failure occurs during session/auth setup (e.g. an SSL/session error —
+        # exactly the transport failure the handler translates). Assigning them inside
+        # the try would leave them unbound and raise UnboundLocalError, masking the
+        # real exception. ``start`` uses ``time.monotonic`` (not ``self.loop.time``)
+        # because ``self.loop`` is only populated once the session is created, which
+        # happens inside the try — and is only used here for duration logging.
+        orig_body = body
+        url_path = self.url_prefix + url
+        start = time.monotonic()
+
         try:
             # Ensure session is created (from parent class)
             if self.session is None:
@@ -167,8 +179,6 @@ class BufferedAsyncHttpConnection(AsyncHttpConnection):
             assert self.session is not None
 
             # Build URL and prepare request (following parent class logic)
-            orig_body = body
-            url_path = self.url_prefix + url
             if params:
                 query_string = urlencode(params)
             else:
@@ -200,8 +210,6 @@ class BufferedAsyncHttpConnection(AsyncHttpConnection):
                     **self._http_auth(method=method, url=url, body=body, headers=req_headers),
                 }
 
-            start = self.loop.time()
-
             # Make request with streaming response handling
             async with self.session.request(
                 method,
@@ -222,7 +230,7 @@ class BufferedAsyncHttpConnection(AsyncHttpConnection):
                         self.max_response_size is not None
                         and total_size + len(chunk) > self.max_response_size
                     ):
-                        duration = self.loop.time() - start
+                        duration = time.monotonic() - start
                         self.log_request_fail(
                             method,
                             str(url),
@@ -251,7 +259,7 @@ class BufferedAsyncHttpConnection(AsyncHttpConnection):
                 response_data = b''.join(chunks)
                 raw_data = response_data.decode('utf-8', 'surrogatepass')
 
-                duration = self.loop.time() - start
+                duration = time.monotonic() - start
 
             # Handle warnings (following parent class logic)
             warning_headers = response.headers.getall('warning', ())
@@ -306,7 +314,7 @@ class BufferedAsyncHttpConnection(AsyncHttpConnection):
         except Exception as e:
             # Translate genuine transport failures exactly as the parent does, so
             # callers see the opensearch-py exception types they expect.
-            duration = self.loop.time() - start
+            duration = time.monotonic() - start
             self.log_request_fail(method, str(url), url_path, orig_body, duration, exception=e)
             _log_request_event(
                 method, original_url, None, round(duration * 1000, 2), 'error', error=str(e)

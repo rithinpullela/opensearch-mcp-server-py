@@ -462,3 +462,29 @@ class TestStreamingEarlyAbort:
         # Must have stopped early: 250-byte cap / 100-byte chunks => abort on the 3rd
         # chunk, NOT after consuming all 10.
         assert consumed['count'] == 3, consumed['count']
+
+
+class TestSessionSetupFailureTranslation:
+    """A failure during session/auth setup must translate to an opensearch-py error.
+
+    Regression test for the adversarial-review BLOCKER: the except handler referenced
+    locals assigned later inside the try, so a session-creation failure raised
+    UnboundLocalError and masked the real transport error. The handler must instead
+    surface ConnectionError/SSLError/ConnectionTimeout.
+    """
+
+    @pytest.mark.asyncio
+    async def test_session_creation_failure_raises_connection_error(self):
+        from opensearchpy.exceptions import ConnectionError as OSConnectionError
+        from unittest.mock import AsyncMock
+
+        conn = BufferedAsyncHttpConnection(
+            host='localhost', port=9200, use_ssl=False, max_response_size=1024
+        )
+        conn.session = None
+        # Simulate a session/SSL setup failure — the exact transport error the
+        # handler exists to translate. Must NOT raise UnboundLocalError.
+        conn._create_aiohttp_session = AsyncMock(side_effect=OSError('SSL handshake failed'))
+
+        with pytest.raises(OSConnectionError):
+            await conn.perform_request(method='GET', url='/test')
