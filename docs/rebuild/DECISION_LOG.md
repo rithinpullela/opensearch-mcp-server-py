@@ -226,3 +226,25 @@ Gate: 623 passed, ruff clean, registry byte-identical (48, plain dict), core.py 
 O10 (NEW): the 4 ex-generated tools (Msearch/Explain/Count/ClusterHealth) now validate base
 connection args with their real baseToolArgs types instead of coercing all to str (more correct;
 aligns with every other tool). CHANGELOG-worthy, low risk.
+
+## D16 — FIX the MCP isError contract [OBSERVABLE O1] (workflow-decided FIX-NOW/minimal)
+**Fork:** fix vs defer the audit's #1 correctness finding (P1-3) — tool-execution failures were
+returned to MCP clients as SUCCESS (CallToolResult isError=false), the failure smuggled only into a
+private is_error key. Decision workflow (3 analysts + judge) → **FIX-NOW via the minimal mechanism.**
+The judge empirically falsified the "defer/huge-churn" fear: execute_tool is imported by exactly ONE
+test file, only ONE assertion sits on its boundary, and mcp 1.26/1.27 low-level call_tool passes a
+returned CallToolResult(isError=...) through verbatim (verified in both venvs + a live serialization
+check showing wire isError=True with text preserved byte-for-byte).
+**Mechanism (chokepoint, ~6 prod lines):** in tool_executor.execute_tool, the soft-error branch now
+`return CallToolResult(content=result, isError=True)` instead of the bare list; success still returns
+the bare list. Did NOT use `raise` (that routes through _make_error_result which would drop the
+structured content + reformat the message). Widened 3 return annotations to
+`list[TextContent] | CallToolResult` (execute_tool + both call_tool wrappers; wrapper bodies unchanged).
+Pre-invocation errors (unknown tool, arg/jsonschema validation) already raise→isError=true, untouched.
+**Oracle-first sequencing (false-green prevention):** reworked integration_tests/framework/assertions.py
+to read `result.isError` as PRIMARY (text-prefix kept as secondary belt-and-suspenders) — transparently
+re-points all 127 integration call sites with zero per-test edits. Migrated the single execute_tool
+boundary assertion in test_tool_executor.py to assert CallToolResult/isError; the 12 other is_error
+assertions test log_tool_error/tool functions directly (the tool→executor soft-dict contract is
+preserved) and are untouched.
+Gate: 623 passed, ruff clean; live check confirms wire isError=True + exact text preserved.

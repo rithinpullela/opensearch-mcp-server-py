@@ -17,7 +17,7 @@ tool invocation, enabling metric filters for:
 
 import logging
 import time
-from mcp.types import TextContent
+from mcp.types import CallToolResult, TextContent
 
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ async def execute_tool(
     name: str,
     arguments: dict,
     enabled_tools: dict,
-) -> list[TextContent]:
+) -> list[TextContent] | CallToolResult:
     """Execute an MCP tool with structured logging for metrics.
 
     Resolves the tool by display name, validates arguments, executes,
@@ -39,10 +39,15 @@ async def execute_tool(
         enabled_tools: The enabled tools registry dict.
 
     Returns:
-        list[TextContent]: The tool's result (success or error text).
+        On success, the tool's result content list. On a tool-execution failure
+        (a soft error carrying ``is_error``), a ``CallToolResult`` with
+        ``isError=True`` so spec-compliant MCP clients can detect the failure — the
+        low-level SDK passes that flag through to the wire. The error message text is
+        unchanged and still appears in ``content[0].text``.
 
     Raises:
-        ValueError: If the tool name is unknown or disabled.
+        ValueError: If the tool name is unknown or disabled (pre-invocation errors
+            raise and the SDK already surfaces them as ``isError=True``).
     """
     start_time = time.monotonic()
     status = 'success'
@@ -73,6 +78,13 @@ async def execute_tool(
         if result and len(result) > 0:
             if isinstance(result[0], dict) and result[0].get('is_error'):
                 status = 'error'
+                # Surface the failure on the wire: a bare list would be serialized by
+                # the SDK as CallToolResult(isError=False), making every tool error look
+                # like a success to spec-compliant clients. Returning CallToolResult with
+                # isError=True is passed through verbatim by the low-level server; the
+                # content (incl. the exact 'Error <op>: <exc>' text and the legacy
+                # is_error key) is preserved.
+                return CallToolResult(content=result, isError=True)
 
         return result
 

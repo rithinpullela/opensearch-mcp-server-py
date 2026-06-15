@@ -7,6 +7,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Added
 
 ### Fixed
+- Fix MCP `isError` contract: tool-execution failures (OpenSearch connection errors, index_not_found, query-parse errors, version-gate failures, generic-API 4xx/5xx) now correctly set `CallToolResult.isError=true` on the wire per the MCP spec. Previously these were returned as successful results (`isError=false`) with the error only in a private `is_error` key, so spec-compliant clients/LLM agents could not distinguish a failed tool call from a success without string-matching the text. The error message text (`Error <operation>: <exception>`) is unchanged and still appears in `content[0].text`. Behavior change: clients that treated failed calls as success (isError=false) will now see isError=true; clients that branch on the response text are unaffected.
 - Fix Streamable HTTP `/mcp` endpoint issuing a 307 redirect to `/mcp/`, which broke strict proxies/clients that don't follow redirects mid-session. The bare `/mcp` path is now served directly via a `Route` ([#273](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/273))
 
 ### Removed
