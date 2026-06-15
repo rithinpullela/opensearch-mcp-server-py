@@ -90,7 +90,7 @@ class TestOpenSearchClient:
         assert call_kwargs['verify_certs'] is True
         assert call_kwargs['connection_class'] == BufferedAsyncHttpConnection
         assert call_kwargs['timeout'] == 30
-        assert call_kwargs['max_response_size'] is None  # No limit by default
+        assert call_kwargs['max_response_size'] == 10 * 1024 * 1024  # 10 MiB default
         assert call_kwargs['headers']['user-agent'].startswith('opensearch-mcp-server-py/')
         assert call_kwargs['http_auth'] == ('test-user', 'test-password')
 
@@ -132,7 +132,7 @@ class TestOpenSearchClient:
         assert call_kwargs['use_ssl'] is True
         assert call_kwargs['verify_certs'] is True
         assert call_kwargs['connection_class'] == BufferedAsyncHttpConnection
-        assert call_kwargs['max_response_size'] is None  # No limit by default
+        assert call_kwargs['max_response_size'] == 10 * 1024 * 1024  # 10 MiB default
         assert isinstance(call_kwargs['http_auth'], AWSV4SignerAsyncAuth)
 
     @patch('opensearch.client.AsyncOpenSearch')
@@ -199,7 +199,7 @@ class TestOpenSearchClient:
         assert call_kwargs['verify_certs'] is True
         assert call_kwargs['connection_class'] == BufferedAsyncHttpConnection
         assert call_kwargs['timeout'] == 30
-        assert call_kwargs['max_response_size'] is None  # No limit by default
+        assert call_kwargs['max_response_size'] == 10 * 1024 * 1024  # 10 MiB default
         assert call_kwargs['headers']['user-agent'].startswith('opensearch-mcp-server-py/')
         assert 'http_auth' not in call_kwargs
 
@@ -310,7 +310,7 @@ class TestOpenSearchClient:
         assert call_kwargs['use_ssl'] is False  # http:// URL
         assert call_kwargs['verify_certs'] is True
         assert call_kwargs['connection_class'] == BufferedAsyncHttpConnection
-        assert call_kwargs['max_response_size'] is None  # No limit by default
+        assert call_kwargs['max_response_size'] == 10 * 1024 * 1024  # 10 MiB default
         # Should not have http_auth when no-auth is True
         assert 'http_auth' not in call_kwargs
 

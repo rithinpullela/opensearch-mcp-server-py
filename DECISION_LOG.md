@@ -124,3 +124,24 @@ for 2 of 3 log-hygiene fixes. Surgical path fixes the SAME defects for ~30x less
 **Observable changes (flag for maintainer, O4 + log hygiene):** partial AWS header creds now RAISE
 (CHANGELOG breaking note for partial-cred configs); IAM ARN no longer at INFO; bearer UA preserved.
 Gate: 660 passed, ruff clean. Net: ~600 fewer lines than wiring, same correctness.
+
+## D12 — Response-size limiting redesign (connection.py) [OBSERVABLE: O2/O3]
+Audit P1-5/6/7/9 + DESIGN_DECISIONS §2. connection.py net -16 lines (deleted the post-hoc fallback).
+- **DEFAULT_MAX_RESPONSE_SIZE: None → 10 MiB.** Protection ON by default, ending the code/docs
+  divergence (USER_GUIDE claimed 10MB in 3 places; code was None). **OBSERVABLE (O2):** large
+  `_search`/`_cat` responses >10MB now raise ResponseSizeExceededError; opt out via
+  OPENSEARCH_MAX_RESPONSE_SIZE or per-call override. Flag for maintainer + CHANGELOG.
+- **Short-circuit when limit is None:** `perform_request` delegates fully to `super()` (inherits
+  parent auth/TLS/gzip/exception-translation verbatim, no second buffering pass).
+- **Decode → `('utf-8','surrogatepass')`** matching the parent (the old strict utf-8 + str(bytes)
+  fallback corrupted valid responses with surrogate code points).
+- **Deleted `_fallback_perform_request`** (P1-7/P1-10): it downloaded the whole body then measured
+  (defeating memory safety) AND the broad `except` re-issued every 4xx/5xx as a 2nd HTTP request
+  (single 404 = 2 requests; dangerous for non-idempotent writes). **OBSERVABLE (O3):** transport
+  errors now propagate (translated to ConnectionTimeout/SSLError/ConnectionError exactly as the
+  parent does — reproduced via reraise_exceptions + the aiohttp->opensearch mapping); HTTP-status
+  errors (TransportError subclasses from _raise_error) propagate unchanged; NO re-issue.
+- Tests: updated test_init_default (10MB), replaced fallback test with short-circuit-when-None test,
+  added a real streaming early-abort test (proves abort at chunk 3 of 10 BEFORE buffering the whole
+  body — the memory-safety guarantee the audit said was untested), fixed 4 client tests asserting the
+  old None default. Gate: 661 passed, ruff clean.

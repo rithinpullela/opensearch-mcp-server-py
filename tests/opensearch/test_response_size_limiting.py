@@ -23,11 +23,11 @@ class TestBufferedAsyncHttpConnection:
     """Test the BufferedAsyncHttpConnection class."""
 
     def test_init_default_max_response_size(self):
-        """Test initialization with default max_response_size (None - no limit)."""
+        """Default max_response_size is 10 MiB (protection on by default, matches USER_GUIDE)."""
         connection = BufferedAsyncHttpConnection(host='localhost', port=9200, use_ssl=False)
 
         assert connection.max_response_size == DEFAULT_MAX_RESPONSE_SIZE
-        assert connection.max_response_size is None  # No limit by default
+        assert connection.max_response_size == 10 * 1024 * 1024
         assert connection.host == 'http://localhost:9200'
 
     def test_init_custom_max_response_size(self):
@@ -40,13 +40,18 @@ class TestBufferedAsyncHttpConnection:
         assert connection.max_response_size == custom_size
 
     @pytest.mark.asyncio
-    async def test_perform_request_fallback_to_parent(self):
-        """Test that perform_request falls back to parent implementation on error."""
+    async def test_perform_request_delegates_to_parent_when_limit_none(self):
+        """When max_response_size is None, perform_request delegates fully to the parent.
+
+        Replaces the old fallback-on-error behavior: there is no longer a post-hoc
+        fallback (which double-issued requests on 4xx/5xx). Instead, disabling the
+        limit short-circuits to the parent so its auth/TLS/exception-translation are
+        inherited verbatim with no second buffering pass.
+        """
         connection = BufferedAsyncHttpConnection(
-            host='localhost', port=9200, use_ssl=False, max_response_size=1024
+            host='localhost', port=9200, use_ssl=False, max_response_size=None
         )
 
-        # Mock parent class perform_request to return a successful response
         with patch.object(connection.__class__.__bases__[0], 'perform_request') as mock_parent:
             mock_parent.return_value = (
                 200,
@@ -54,11 +59,10 @@ class TestBufferedAsyncHttpConnection:
                 '{"status": "ok"}',
             )
 
-            # The streaming implementation will fail and fall back to parent
             status, headers, data = await connection.perform_request(method='GET', url='/test')
 
             assert status == 200
-            assert data == '{"status": "ok"}'  # Should be string, not bytes
+            assert data == '{"status": "ok"}'
             mock_parent.assert_called_once()
 
     def test_response_decoding_logic(self):
@@ -408,3 +412,53 @@ class TestIntegrationScenarios:
         # Simulate a response much smaller than the limit
         simulated_response_size = 20 * 1024  # 20KB
         assert simulated_response_size < large_limit
+
+
+class TestStreamingEarlyAbort:
+    """Prove the size limit aborts mid-stream BEFORE the whole body is buffered.
+
+    This is the actual memory-safety guarantee (audit P1-7): the prior tests only
+    checked post-hoc arithmetic. Here we drive the real streaming loop with a mock
+    aiohttp response whose chunk iterator records how many chunks were consumed, and
+    assert it raises ResponseSizeExceededError after exceeding the cap — without
+    reading the remaining chunks.
+    """
+
+    @pytest.mark.asyncio
+    async def test_aborts_before_consuming_all_chunks(self):
+        import contextlib
+        from unittest.mock import AsyncMock, MagicMock
+
+        consumed = {'count': 0}
+
+        async def chunk_iter(_size):
+            # 10 chunks of 100 bytes = 1000 bytes total; limit is 250 -> abort ~chunk 3.
+            for _ in range(10):
+                consumed['count'] += 1
+                yield b'x' * 100
+
+        response = MagicMock()
+        response.content.iter_chunked = chunk_iter
+        response.headers.getall = MagicMock(return_value=())
+        response.status = 200
+
+        @contextlib.asynccontextmanager
+        async def fake_request(*args, **kwargs):
+            yield response
+
+        conn = BufferedAsyncHttpConnection(
+            host='localhost', port=9200, use_ssl=False, max_response_size=250
+        )
+        conn.session = MagicMock()
+        conn.session.request = fake_request
+        conn._create_aiohttp_session = AsyncMock()
+        conn.loop = MagicMock()
+        conn.loop.time = MagicMock(return_value=0.0)
+        conn._http_auth = None
+
+        with pytest.raises(ResponseSizeExceededError, match='exceeded limit of 250 bytes'):
+            await conn.perform_request(method='GET', url='/big')
+
+        # Must have stopped early: 250-byte cap / 100-byte chunks => abort on the 3rd
+        # chunk, NOT after consuming all 10.
+        assert consumed['count'] == 3, consumed['count']
