@@ -46,20 +46,6 @@ def patch_opensearch_version():
         yield
 
 
-@pytest.fixture(autouse=True)
-def mock_generate_tools():
-    """Mock the generate_tools_from_openapi function."""
-
-    async def mock_gen_tools():
-        return None
-
-    with patch(
-        'mcp_server_opensearch.stdio_server.generate_tools_from_openapi',
-        side_effect=mock_gen_tools,
-    ):
-        yield
-
-
 @pytest.fixture
 def mock_server():
     """Create a mock Server instance."""
@@ -109,9 +95,7 @@ def mock_tool_registry():
 
 
 @pytest.mark.asyncio
-async def test_serve_initialization(
-    mock_server, mock_stdio, mock_tool_registry, mock_generate_tools
-):
+async def test_serve_initialization(mock_server, mock_stdio, mock_tool_registry):
     """Test server initialization."""
     reader, writer = mock_stdio
 
@@ -129,7 +113,7 @@ async def test_serve_initialization(
 
 
 @pytest.mark.asyncio
-async def test_list_tools(mock_server, mock_stdio, mock_tool_registry, mock_generate_tools):
+async def test_list_tools(mock_server, mock_stdio, mock_tool_registry):
     """Test list_tools functionality."""
     reader, writer = mock_stdio
 
@@ -166,7 +150,7 @@ async def test_list_tools(mock_server, mock_stdio, mock_tool_registry, mock_gene
 
 
 @pytest.mark.asyncio
-async def test_call_tool(mock_server, mock_stdio, mock_tool_registry, mock_generate_tools):
+async def test_call_tool(mock_server, mock_stdio, mock_tool_registry):
     """Test call_tool functionality."""
     reader, writer = mock_stdio
 
@@ -216,9 +200,7 @@ async def test_server_error_handling(mock_server, mock_stdio, mock_tool_registry
 
 
 @pytest.mark.asyncio
-async def test_tool_execution_error(
-    mock_server, mock_stdio, mock_tool_registry, mock_generate_tools
-):
+async def test_tool_execution_error(mock_server, mock_stdio, mock_tool_registry):
     """Test tool execution error handling."""
     reader, writer = mock_stdio
 

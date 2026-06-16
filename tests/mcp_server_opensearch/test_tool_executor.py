@@ -62,7 +62,14 @@ class TestExecuteTool:
         with caplog.at_level(logging.ERROR):
             result = await execute_tool('TestTool', {}, enabled_tools)
 
-        assert result[0]['is_error'] is True
+        # Soft errors now surface as a protocol-level CallToolResult(isError=True) so
+        # spec-compliant MCP clients can detect the failure. The exact error text and
+        # the legacy is_error key are preserved inside content[0].
+        from mcp.types import CallToolResult
+
+        assert isinstance(result, CallToolResult)
+        assert result.isError is True
+        assert result.content[0].text.startswith('Error searching index: connection refused')
         error_records = [
             r
             for r in caplog.records

@@ -750,11 +750,12 @@ def _flatten_object(obj: dict, row: dict, prefix: str = '') -> None:
             row[field_name] = str(value) if value is not None else ''
 
 
-async def get_opensearch_version(args: baseToolArgs) -> Version:
-    """Get the version of OpenSearch cluster.
+async def _fetch_opensearch_version(args: baseToolArgs) -> Version:
+    """Fetch the OpenSearch cluster version directly (uncached).
 
-    Returns:
-        Version: The version of OpenSearch cluster (SemVer style)
+    Opens a client, issues ``GET /``, and parses ``version.number``. Returns
+    ``None`` on any error (preserving the prior fail-open behavior). This is the
+    real network fetch wrapped by the per-target version cache.
     """
     from .client import get_opensearch_client
 
@@ -765,6 +766,54 @@ async def get_opensearch_version(args: baseToolArgs) -> Version:
     except Exception as e:
         logger.error(f'Error getting OpenSearch version: {e}')
         return None
+
+
+async def get_opensearch_version(args: baseToolArgs) -> Version:
+    """Get the version of OpenSearch cluster (cached per connection target).
+
+    The version gate runs on every tool call; this previously opened a fresh
+    client and issued ``GET /`` each time. It now reads through a per-target,
+    TTL-bounded cache (see ``opensearch.version_cache``), so repeated calls against
+    a static cluster collapse to one fetch. Behavior is otherwise unchanged: the
+    same ``Version`` (or ``None`` on error) is returned.
+
+    Returns:
+        Version: The version of OpenSearch cluster (SemVer style), or ``None``.
+    """
+    from .version_cache import get_cached_version
+    from mcp_server_opensearch.global_state import get_mode
+
+    # When header-based auth is active, the real target URL comes from the per-request
+    # ``opensearch-url`` header — which the cache key (built from the env/args/cluster
+    # URL) cannot see. Two requests to physically different clusters via different
+    # headers would otherwise share one cache entry (cross-cluster version bleed), so
+    # bypass the cache and fetch per request whenever header auth is in effect.
+    #
+    # Single mode enables header auth via OPENSEARCH_HEADER_AUTH; multi mode enables it
+    # per-cluster via the cluster config's opensearch_header_auth flag.
+    mode = get_mode()
+    if _header_auth_active(args, mode):
+        return await _fetch_opensearch_version(args)
+
+    return await get_cached_version(args, fetch=lambda: _fetch_opensearch_version(args), mode=mode)
+
+
+def _header_auth_active(args: baseToolArgs, mode: str) -> bool:
+    """Return whether per-request header auth is in effect for this call.
+
+    Single mode: the ``OPENSEARCH_HEADER_AUTH`` env flag. Multi mode: the target
+    cluster's ``opensearch_header_auth`` config flag. When true the connection URL is
+    overridden by a per-request header, so the version cache must be bypassed.
+    """
+    import os
+
+    if mode == 'multi':
+        from mcp_server_opensearch.clusters_information import cluster_registry
+
+        cluster = cluster_registry.get(getattr(args, 'opensearch_cluster_name', '') or '')
+        return bool(getattr(cluster, 'opensearch_header_auth', None))
+
+    return os.getenv('OPENSEARCH_HEADER_AUTH', '').lower() == 'true'
 
 
 async def create_agentic_memory_session(

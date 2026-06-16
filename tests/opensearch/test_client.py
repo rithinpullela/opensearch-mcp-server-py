@@ -90,7 +90,7 @@ class TestOpenSearchClient:
         assert call_kwargs['verify_certs'] is True
         assert call_kwargs['connection_class'] == BufferedAsyncHttpConnection
         assert call_kwargs['timeout'] == 30
-        assert call_kwargs['max_response_size'] is None  # No limit by default
+        assert call_kwargs['max_response_size'] == 10 * 1024 * 1024  # 10 MiB default
         assert call_kwargs['headers']['user-agent'].startswith('opensearch-mcp-server-py/')
         assert call_kwargs['http_auth'] == ('test-user', 'test-password')
 
@@ -132,7 +132,7 @@ class TestOpenSearchClient:
         assert call_kwargs['use_ssl'] is True
         assert call_kwargs['verify_certs'] is True
         assert call_kwargs['connection_class'] == BufferedAsyncHttpConnection
-        assert call_kwargs['max_response_size'] is None  # No limit by default
+        assert call_kwargs['max_response_size'] == 10 * 1024 * 1024  # 10 MiB default
         assert isinstance(call_kwargs['http_auth'], AWSV4SignerAsyncAuth)
 
     @patch('opensearch.client.AsyncOpenSearch')
@@ -199,7 +199,7 @@ class TestOpenSearchClient:
         assert call_kwargs['verify_certs'] is True
         assert call_kwargs['connection_class'] == BufferedAsyncHttpConnection
         assert call_kwargs['timeout'] == 30
-        assert call_kwargs['max_response_size'] is None  # No limit by default
+        assert call_kwargs['max_response_size'] == 10 * 1024 * 1024  # 10 MiB default
         assert call_kwargs['headers']['user-agent'].startswith('opensearch-mcp-server-py/')
         assert 'http_auth' not in call_kwargs
 
@@ -310,7 +310,7 @@ class TestOpenSearchClient:
         assert call_kwargs['use_ssl'] is False  # http:// URL
         assert call_kwargs['verify_certs'] is True
         assert call_kwargs['connection_class'] == BufferedAsyncHttpConnection
-        assert call_kwargs['max_response_size'] is None  # No limit by default
+        assert call_kwargs['max_response_size'] == 10 * 1024 * 1024  # 10 MiB default
         # Should not have http_auth when no-auth is True
         assert 'http_auth' not in call_kwargs
 
@@ -818,7 +818,11 @@ class TestHeaderBasedBearerAuth:
         # Assert
         assert client == mock_client
         call_kwargs = mock_opensearch.call_args[1]
-        assert call_kwargs['headers'] == {'Authorization': f'Bearer {bearer_token}'}
+        # The Authorization header is set, and the custom User-Agent is PRESERVED
+        # (the bearer path now merges into the base headers rather than replacing
+        # them — fixes the prior User-Agent clobber).
+        assert call_kwargs['headers']['Authorization'] == f'Bearer {bearer_token}'
+        assert 'user-agent' in call_kwargs['headers']
         assert 'http_auth' not in call_kwargs
 
     @patch('opensearch.client.request_ctx')
@@ -932,3 +936,85 @@ class TestParsedWithDefaultPorts:
             self._norm('https://user:secret@my-cluster.example.com/path')
             == 'https://user:secret@my-cluster.example.com:443/path'
         )
+
+
+class TestFailSecurePartialAwsCreds:
+    """Partial AWS header credentials must fail secure, not fall through to ambient.
+
+    Audit O4: previously, supplying access_key + secret_key WITHOUT region (or any
+    partial key material) silently fell through to the server's ambient identity —
+    privilege confusion. Now it raises AuthenticationError. Note aws_region ALONE is
+    legitimate (used by IAM-role / ambient auth) and must NOT trigger the guard.
+    """
+
+    URL = 'https://test-opensearch-domain.com'
+
+    def _create(self, **kwargs):
+        # The guard lives in _create_opensearch_client (the single funnel both
+        # modes use); AWS header creds are passed straight in here.
+        from opensearch.client import _create_opensearch_client
+
+        return _create_opensearch_client(opensearch_url=self.URL, **kwargs)
+
+    @patch('opensearch.client.AsyncOpenSearch')
+    def test_key_and_secret_without_region_raises(self, mock_opensearch):
+        with pytest.raises(AuthenticationError, match='Incomplete AWS header credentials'):
+            self._create(aws_access_key_id='AKIA', aws_secret_access_key='secret')
+        mock_opensearch.assert_not_called()
+
+    @patch('opensearch.client.AsyncOpenSearch')
+    def test_only_access_key_raises(self, mock_opensearch):
+        with pytest.raises(AuthenticationError, match='Incomplete AWS header credentials'):
+            self._create(aws_access_key_id='AKIA')
+        mock_opensearch.assert_not_called()
+
+    @patch('opensearch.client.AsyncOpenSearch')
+    def test_secret_and_region_without_key_raises(self, mock_opensearch):
+        with pytest.raises(AuthenticationError, match='Incomplete AWS header credentials'):
+            self._create(aws_secret_access_key='secret', aws_region='us-east-1')
+        mock_opensearch.assert_not_called()
+
+    @patch('opensearch.client.AWSV4SignerAsyncAuth')
+    @patch('opensearch.client.boto3.Session')
+    @patch('opensearch.client.AsyncOpenSearch')
+    def test_full_triple_succeeds(self, mock_opensearch, mock_session, mock_signer):
+        mock_opensearch.return_value = Mock()
+        # A complete header-AWS triple proceeds to build the client (branch 3).
+        self._create(
+            aws_access_key_id='AKIA', aws_secret_access_key='secret', aws_region='us-east-1'
+        )
+        mock_opensearch.assert_called_once()
+
+    @patch('opensearch.client.AWSV4SignerAsyncAuth')
+    @patch('opensearch.client.boto3.Session')
+    @patch('opensearch.client.AsyncOpenSearch')
+    def test_region_alone_does_not_trigger_guard(self, mock_opensearch, mock_session, mock_signer):
+        # region alone is the ambient-credentials path, not partial header creds.
+        mock_opensearch.return_value = Mock()
+        mock_session.return_value.get_credentials.return_value = Mock()
+        self._create(aws_region='us-east-1')
+        mock_opensearch.assert_called_once()
+
+
+class TestScrubUrlUserinfo:
+    """The log-scrub helper removes embedded credentials from URLs (CWE-532)."""
+
+    def _scrub(self, url):
+        from opensearch.client import _scrub_url_userinfo
+
+        return _scrub_url_userinfo(url)
+
+    def test_strips_user_and_password(self):
+        assert self._scrub('https://user:pass@host:9200/path') == 'https://host:9200/path'
+
+    def test_strips_user_only(self):
+        assert self._scrub('https://user@host:9200') == 'https://host:9200'
+
+    def test_no_userinfo_unchanged(self):
+        assert self._scrub('https://host:9200/path') == 'https://host:9200/path'
+
+    def test_empty_unchanged(self):
+        assert self._scrub('') == ''
+
+    def test_ipv6_host_preserved(self):
+        assert self._scrub('https://user:pass@[::1]:9200') == 'https://[::1]:9200'

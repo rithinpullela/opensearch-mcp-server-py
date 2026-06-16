@@ -16,7 +16,12 @@ from opensearchpy import AsyncHttpConnection
 logger = logging.getLogger(__name__)
 
 # Constants
-DEFAULT_MAX_RESPONSE_SIZE = None  # No limit by default - only enforce when explicitly set
+# Default maximum response size: 10 MiB. Protection is ON by default to prevent a
+# very large OpenSearch response from exhausting process memory, and this matches
+# the value documented in USER_GUIDE.md. Set OPENSEARCH_MAX_RESPONSE_SIZE (or the
+# per-call override) to raise/lower it; the limit is enforced on the *decompressed*
+# response bytes via incremental streaming (aborts before the whole body is buffered).
+DEFAULT_MAX_RESPONSE_SIZE = 10 * 1024 * 1024  # 10 MiB
 
 
 # Base exception class (to avoid circular imports)
@@ -82,7 +87,8 @@ class BufferedAsyncHttpConnection(AsyncHttpConnection):
 
         Args:
             *args: Arguments passed to parent AsyncHttpConnection.
-            max_response_size: Maximum allowed response size in bytes (default: None - no limit).
+            max_response_size: Maximum allowed response size in bytes (default: 10 MiB).
+                Pass ``None`` to disable the limit (delegates to the parent connection).
             **kwargs: Keyword arguments passed to parent AsyncHttpConnection.
         """
         super().__init__(*args, **kwargs)
@@ -117,24 +123,62 @@ class BufferedAsyncHttpConnection(AsyncHttpConnection):
         Raises:
             ResponseSizeExceededError: If response exceeds max_response_size during streaming
         """
+        # When no limit is configured, there is nothing this subclass adds over the
+        # parent — delegate entirely so we inherit the parent's auth, TLS, gzip,
+        # warning handling, and aiohttp->opensearch-py exception translation verbatim
+        # (no risk of drift, and no second buffering pass).
+        if self.max_response_size is None:
+            return await super().perform_request(
+                method,
+                url,
+                params=params,
+                body=body,
+                timeout=timeout,
+                ignore=ignore,
+                headers=headers,
+            )
+
         logger.debug(
             f'Making size-limited request: {method} {url} (max_size={self.max_response_size})'
         )
         original_url = url
-        try:
-            # Import required modules
-            import aiohttp
-            import yarl
-            from urllib.parse import urlencode
 
+        # Import required modules
+        import aiohttp
+        import asyncio
+        import yarl
+
+        # For reproducing the parent's exception translation (see the except blocks
+        # below): without the old fallback path, transport errors must still surface
+        # as the opensearch-py types callers expect — never a raw aiohttp error, and
+        # never by re-issuing the request.
+        from opensearchpy.compat import reraise_exceptions
+        from opensearchpy.exceptions import (
+            ConnectionError,
+            ConnectionTimeout,
+            SSLError,
+            TransportError,
+        )
+        from urllib.parse import urlencode
+
+        # Hoisted above the try: so the except handler can always reference them, even
+        # if the failure occurs during session/auth setup (e.g. an SSL/session error —
+        # exactly the transport failure the handler translates). Assigning them inside
+        # the try would leave them unbound and raise UnboundLocalError, masking the
+        # real exception. ``start`` uses ``time.monotonic`` (not ``self.loop.time``)
+        # because ``self.loop`` is only populated once the session is created, which
+        # happens inside the try — and is only used here for duration logging.
+        orig_body = body
+        url_path = self.url_prefix + url
+        start = time.monotonic()
+
+        try:
             # Ensure session is created (from parent class)
             if self.session is None:
                 await self._create_aiohttp_session()
             assert self.session is not None
 
             # Build URL and prepare request (following parent class logic)
-            orig_body = body
-            url_path = self.url_prefix + url
             if params:
                 query_string = urlencode(params)
             else:
@@ -166,8 +210,6 @@ class BufferedAsyncHttpConnection(AsyncHttpConnection):
                     **self._http_auth(method=method, url=url, body=body, headers=req_headers),
                 }
 
-            start = self.loop.time()
-
             # Make request with streaming response handling
             async with self.session.request(
                 method,
@@ -188,7 +230,7 @@ class BufferedAsyncHttpConnection(AsyncHttpConnection):
                         self.max_response_size is not None
                         and total_size + len(chunk) > self.max_response_size
                     ):
-                        duration = self.loop.time() - start
+                        duration = time.monotonic() - start
                         self.log_request_fail(
                             method,
                             str(url),
@@ -210,15 +252,14 @@ class BufferedAsyncHttpConnection(AsyncHttpConnection):
                     chunks.append(chunk)
                     total_size += len(chunk)
 
-                # Combine all chunks and decode
+                # Combine all chunks and decode. Use 'surrogatepass' to match the
+                # parent (opensearch-py) decode exactly — a plain 'utf-8' decode with
+                # a str(bytes) fallback would corrupt valid responses containing
+                # surrogate code points.
                 response_data = b''.join(chunks)
-                try:
-                    raw_data = response_data.decode('utf-8')
-                except UnicodeDecodeError:
-                    # For binary data, convert to string representation
-                    raw_data = str(response_data)
+                raw_data = response_data.decode('utf-8', 'surrogatepass')
 
-                duration = self.loop.time() - start
+                duration = time.monotonic() - start
 
             # Handle warnings (following parent class logic)
             warning_headers = response.headers.getall('warning', ())
@@ -261,74 +302,25 @@ class BufferedAsyncHttpConnection(AsyncHttpConnection):
 
             return response.status, response.headers, raw_data
 
-        except ResponseSizeExceededError:
+        except reraise_exceptions:
+            # RecursionError / CancelledError — propagate as-is (matches parent).
+            raise
+        except (ResponseSizeExceededError, TransportError):
+            # Our own size guard, and HTTP-status errors raised by _raise_error
+            # (NotFoundError/RequestError/etc.) must propagate unchanged. We do NOT
+            # retry or re-issue the request (the old fallback double-issued every
+            # 4xx/5xx — dangerous for non-idempotent writes).
             raise
         except Exception as e:
-            # For connection errors and other failures, fall back to parent implementation
-            logger.warning(
-                f'Streaming request failed ({type(e).__name__}: {e}), falling back to parent implementation'
-            )
-            return await self._fallback_perform_request(
-                method, original_url, params, body, timeout, ignore, headers
-            )
-
-    async def _fallback_perform_request(
-        self, method, url, params=None, body=None, timeout=None, ignore=(), headers=None
-    ):
-        """Fallback to parent implementation with post-download size checking.
-
-        This is used when streaming is not available or fails.
-        """
-        fallback_start = time.monotonic()
-        try:
-            # Use parent implementation for the actual request (preserves auth)
-            status, response_headers, response_data = await super().perform_request(
-                method, url, params, body, timeout, ignore, headers
-            )
-
-            # Check response size after getting the data (only if limit is set)
-            if isinstance(response_data, str):
-                data_size = len(response_data.encode('utf-8'))
-            elif isinstance(response_data, bytes):
-                data_size = len(response_data)
-            else:
-                # Unknown data type, convert to string and measure
-                data_size = len(str(response_data).encode('utf-8'))
-
-            if self.max_response_size is not None and data_size > self.max_response_size:
-                logger.error(
-                    f'Response size exceeded limit: {data_size} > {self.max_response_size} bytes'
-                )
-                raise ResponseSizeExceededError(
-                    f'Response size exceeded limit of {self.max_response_size} bytes. '
-                    f'Received {data_size} bytes. '
-                    f'Consider increasing max_response_size or refining your query to return less data.'
-                )
-
-            fallback_duration_ms = round((time.monotonic() - fallback_start) * 1000, 2)
+            # Translate genuine transport failures exactly as the parent does, so
+            # callers see the opensearch-py exception types they expect.
+            duration = time.monotonic() - start
+            self.log_request_fail(method, str(url), url_path, orig_body, duration, exception=e)
             _log_request_event(
-                method,
-                url,
-                status,
-                fallback_duration_ms,
-                'success',
-                response_size=data_size,
+                method, original_url, None, round(duration * 1000, 2), 'error', error=str(e)
             )
-
-            return status, response_headers, response_data
-
-        except ResponseSizeExceededError:
-            raise
-        except Exception as e:
-            fallback_duration_ms = round((time.monotonic() - fallback_start) * 1000, 2)
-            raw_status = getattr(e, 'status_code', None)
-            exc_status_code = raw_status if isinstance(raw_status, int) else None
-            _log_request_event(
-                method,
-                url,
-                exc_status_code,
-                fallback_duration_ms,
-                'error',
-                error=str(e),
-            )
-            raise
+            if isinstance(e, aiohttp.ServerFingerprintMismatch):
+                raise SSLError('N/A', str(e), e)
+            if isinstance(e, (asyncio.TimeoutError, aiohttp.ServerTimeoutError)):
+                raise ConnectionTimeout('TIMEOUT', str(e), e)
+            raise ConnectionError('N/A', str(e), e)

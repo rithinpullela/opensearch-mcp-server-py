@@ -817,3 +817,141 @@ class TestSearchConfigurationHelpers:
         mock_client.plugins.search_relevance.delete_search_configurations.assert_called_once_with(
             search_configuration_id='cfg-1'
         )
+
+
+class TestVersionCacheHeaderAuthBypass:
+    """When OPENSEARCH_HEADER_AUTH=true the version fetch must bypass the cache.
+
+    The real target URL comes from the per-request opensearch-url header, which the
+    cache key (env/args URL) cannot see — caching would bleed one cluster's version
+    to another. Regression test for the adversarial-review MAJOR.
+    """
+
+    def setup_method(self):
+        from opensearch.version_cache import clear_cache
+
+        clear_cache()
+
+    @pytest.mark.asyncio
+    async def test_header_auth_bypasses_cache(self, monkeypatch):
+        import opensearch.helper as helper_mod
+        from tools.tool_params import baseToolArgs
+
+        monkeypatch.setenv('OPENSEARCH_HEADER_AUTH', 'true')
+
+        calls = {'n': 0}
+
+        async def fake_fetch(_args):
+            calls['n'] += 1
+            from semver import Version
+
+            return Version.parse('2.0.0')
+
+        monkeypatch.setattr(helper_mod, '_fetch_opensearch_version', fake_fetch)
+
+        args = baseToolArgs(opensearch_cluster_name='')
+        await helper_mod.get_opensearch_version(args)
+        await helper_mod.get_opensearch_version(args)
+
+        # Both calls fetch (no caching) because the real URL is per-request header.
+        assert calls['n'] == 2
+
+    @pytest.mark.asyncio
+    async def test_non_header_auth_uses_cache(self, monkeypatch):
+        import opensearch.helper as helper_mod
+        from tools.tool_params import baseToolArgs
+
+        monkeypatch.delenv('OPENSEARCH_HEADER_AUTH', raising=False)
+        monkeypatch.setenv('OPENSEARCH_URL', 'https://fixed-cluster:9200')
+
+        calls = {'n': 0}
+
+        async def fake_fetch(_args):
+            calls['n'] += 1
+            from semver import Version
+
+            return Version.parse('2.0.0')
+
+        monkeypatch.setattr(helper_mod, '_fetch_opensearch_version', fake_fetch)
+
+        args = baseToolArgs(opensearch_cluster_name='')
+        await helper_mod.get_opensearch_version(args)
+        await helper_mod.get_opensearch_version(args)
+
+        # Cached: only one underlying fetch for the same static URL.
+        assert calls['n'] == 1
+
+
+class TestVersionCacheMultiModeHeaderAuthBypass:
+    """Multi-mode per-cluster header-auth must also bypass the version cache.
+
+    Regression test for review #3 MAJOR: the single-mode bypass (OPENSEARCH_HEADER_AUTH)
+    did not cover multi mode, where header auth is enabled per-cluster via
+    cluster_info.opensearch_header_auth and the URL comes from a per-request header.
+    """
+
+    def setup_method(self):
+        from opensearch.version_cache import clear_cache
+
+        clear_cache()
+
+    @pytest.mark.asyncio
+    async def test_multi_mode_header_auth_cluster_bypasses_cache(self, monkeypatch):
+        import opensearch.helper as helper_mod
+        from mcp_server_opensearch import clusters_information
+        from mcp_server_opensearch.clusters_information import ClusterInfo
+        from tools.tool_params import baseToolArgs
+
+        monkeypatch.setattr('mcp_server_opensearch.global_state.get_mode', lambda: 'multi')
+        # A cluster configured with header auth -> URL is per-request -> must bypass cache.
+        monkeypatch.setitem(
+            clusters_information.cluster_registry,
+            'hdr-cluster',
+            ClusterInfo(opensearch_url='https://placeholder:9200', opensearch_header_auth=True),
+        )
+
+        calls = {'n': 0}
+
+        async def fake_fetch(_args):
+            from semver import Version
+
+            calls['n'] += 1
+            return Version.parse('2.0.0')
+
+        monkeypatch.setattr(helper_mod, '_fetch_opensearch_version', fake_fetch)
+
+        args = baseToolArgs(opensearch_cluster_name='hdr-cluster')
+        await helper_mod.get_opensearch_version(args)
+        await helper_mod.get_opensearch_version(args)
+
+        assert calls['n'] == 2  # bypassed: fetched each time
+
+    @pytest.mark.asyncio
+    async def test_multi_mode_non_header_cluster_uses_cache(self, monkeypatch):
+        import opensearch.helper as helper_mod
+        from mcp_server_opensearch import clusters_information
+        from mcp_server_opensearch.clusters_information import ClusterInfo
+        from tools.tool_params import baseToolArgs
+
+        monkeypatch.setattr('mcp_server_opensearch.global_state.get_mode', lambda: 'multi')
+        monkeypatch.setitem(
+            clusters_information.cluster_registry,
+            'fixed-cluster',
+            ClusterInfo(opensearch_url='https://fixed:9200', opensearch_header_auth=False),
+        )
+
+        calls = {'n': 0}
+
+        async def fake_fetch(_args):
+            from semver import Version
+
+            calls['n'] += 1
+            return Version.parse('2.0.0')
+
+        monkeypatch.setattr(helper_mod, '_fetch_opensearch_version', fake_fetch)
+
+        args = baseToolArgs(opensearch_cluster_name='fixed-cluster')
+        await helper_mod.get_opensearch_version(args)
+        await helper_mod.get_opensearch_version(args)
+
+        assert calls['n'] == 1  # cached: fetched once for the static cluster

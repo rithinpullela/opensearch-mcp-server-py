@@ -8,7 +8,7 @@ import uvicorn
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
-from mcp.types import TextContent, Tool
+from mcp.types import CallToolResult, TextContent, Tool
 from mcp_server_opensearch.clusters_information import load_clusters_from_yaml
 from mcp_server_opensearch.global_state import set_config_file_path, set_mode, set_profile
 from mcp_server_opensearch.server_instructions import get_server_instructions
@@ -19,7 +19,6 @@ from starlette.routing import Mount, Route
 from starlette.types import Receive, Scope, Send
 from tools.config import apply_custom_tool_config
 from tools.tool_filter import get_tools
-from tools.tool_generator import generate_tools_from_openapi
 from tools.tools import TOOL_REGISTRY
 from typing import AsyncIterator
 
@@ -48,8 +47,9 @@ async def create_mcp_server(
 
     # Server instructions guide the LLM on dynamic connection params (single mode only)
     server = Server('opensearch-mcp-server', instructions=get_server_instructions())
-    # Call tool generator
-    await generate_tools_from_openapi()
+    # The 4 formerly-generated tools (Msearch/Explain/Count/ClusterHealth) are now
+    # static members of TOOL_REGISTRY (registered at import in tools.tools); no
+    # boot-time OpenAPI fetch is required.
     # Apply custom tool config (custom name and description)
     customized_registry = apply_custom_tool_config(
         TOOL_REGISTRY, config_file_path, cli_tool_overrides or {}
@@ -74,7 +74,7 @@ async def create_mcp_server(
         return tools
 
     @server.call_tool()
-    async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    async def call_tool(name: str, arguments: dict) -> list[TextContent] | CallToolResult:
         from mcp_server_opensearch.tool_executor import execute_tool
 
         return await execute_tool(name, arguments, enabled_tools)

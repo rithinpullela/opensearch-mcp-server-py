@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>opensearch-mcp-server-py · Modular Rebuild Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0e0f; --bg2:#0f1517; --panel:#121a1d; --panel2:#162024;
+    --ink:#e6eff0; --ink-dim:#8fa3a6; --ink-faint:#5b6e71;
+    --line:#1f2c30; --line2:#2a3a3f;
+    --cyan:#27e0c4; --cyan-dim:#1aa890;
+    --amber:#f5a623; --amber-dim:#b87a10;
+    --red:#ff5d5d; --green:#3ddc84; --violet:#9b8cff;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --display:'Fraunces',Georgia,serif;
+    --sans:'Inter Tight',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--sans);
+    line-height:1.6; -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(900px 500px at 88% -8%, rgba(39,224,196,.07), transparent 60%),
+      radial-gradient(700px 500px at -5% 18%, rgba(245,166,35,.05), transparent 55%);
+    background-attachment:fixed;
+  }
+  /* grain */
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.035;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+  .mono{font-family:var(--mono)}
+  a{color:var(--cyan);text-decoration:none}
+
+  /* ---- hero ---- */
+  header.hero{padding:88px 0 54px;border-bottom:1px solid var(--line);position:relative}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--cyan-dim);display:flex;gap:14px;align-items:center}
+  .kicker::before{content:'';width:38px;height:1px;background:var(--cyan-dim)}
+  h1.title{font-family:var(--display);font-weight:900;font-size:clamp(40px,7vw,82px);line-height:.98;letter-spacing:-.02em;margin:22px 0 10px}
+  h1.title em{font-style:italic;color:var(--cyan)}
+  .sub{font-size:clamp(16px,2vw,21px);color:var(--ink-dim);max-width:60ch}
+  .repo-line{font-family:var(--mono);font-size:13px;color:var(--ink-faint);margin-top:26px;display:flex;flex-wrap:wrap;gap:8px 22px}
+  .repo-line b{color:var(--ink-dim);font-weight:500}
+  .verdict{margin-top:30px;display:inline-flex;align-items:center;gap:12px;padding:10px 18px;border:1px solid var(--cyan-dim);border-radius:2px;background:linear-gradient(90deg,rgba(39,224,196,.08),transparent);font-family:var(--mono);font-size:13px;color:var(--cyan)}
+  .verdict .dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 12px var(--cyan);animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.4}}
+
+  /* ---- metric strip ---- */
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin:0 0 0 0}
+  .metric{background:var(--panel);padding:26px 22px;position:relative;overflow:hidden}
+  .metric:hover{background:var(--panel2)}
+  .metric .n{font-family:var(--display);font-weight:600;font-size:46px;line-height:1;letter-spacing:-.02em}
+  .metric .l{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);margin-top:10px}
+  .metric .x{position:absolute;top:14px;right:16px;font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .c-cyan{color:var(--cyan)} .c-amber{color:var(--amber)} .c-green{color:var(--green)} .c-violet{color:var(--violet)}
+
+  section{padding:62px 0;border-bottom:1px solid var(--line)}
+  .sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:30px}
+  .sec-num{font-family:var(--mono);font-size:13px;color:var(--amber)}
+  h2{font-family:var(--display);font-weight:600;font-size:clamp(26px,3.4vw,38px);letter-spacing:-.01em}
+  .lead{color:var(--ink-dim);max-width:68ch;margin-bottom:28px;font-size:17px}
+
+  /* ---- old vs new ---- */
+  .ovn{display:grid;grid-template-columns:1fr 64px 1fr;gap:0;align-items:stretch;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+  .ovn .col{padding:26px 24px}
+  .ovn .old{background:#15100f}
+  .ovn .new{background:#0d1614}
+  .ovn .mid{display:flex;align-items:center;justify-content:center;background:var(--bg2);border-left:1px solid var(--line);border-right:1px solid var(--line);font-family:var(--mono);color:var(--cyan);font-size:22px}
+  .ovn h3{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:16px}
+  .ovn .old h3{color:var(--amber)} .ovn .new h3{color:var(--cyan)}
+  .ovn ul{list-style:none;display:flex;flex-direction:column;gap:11px}
+  .ovn li{font-size:14.5px;color:var(--ink-dim);padding-left:20px;position:relative;line-height:1.45}
+  .ovn .old li::before{content:'\2715';position:absolute;left:0;color:var(--amber-dim);font-size:12px;top:2px}
+  .ovn .new li::before{content:'\2713';position:absolute;left:0;color:var(--green);font-size:13px;top:1px}
+  .ovn li b{color:var(--ink);font-weight:600}
+  @media(max-width:780px){.ovn{grid-template-columns:1fr}.ovn .mid{height:46px;border:none;border-top:1px solid var(--line);border-bottom:1px solid var(--line);transform:rotate(90deg) }}
+
+  /* ---- change cards ---- */
+  .changes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:24px;position:relative;transition:transform .18s,border-color .18s}
+  .card:hover{transform:translateY(-3px);border-color:var(--line2)}
+  .card .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;border-radius:2px;display:inline-block;margin-bottom:13px}
+  .t-fix{background:rgba(61,220,132,.12);color:var(--green);border:1px solid rgba(61,220,132,.3)}
+  .t-perf{background:rgba(39,224,196,.12);color:var(--cyan);border:1px solid rgba(39,224,196,.3)}
+  .t-sec{background:rgba(255,93,93,.1);color:var(--red);border:1px solid rgba(255,93,93,.3)}
+  .t-struct{background:rgba(155,140,255,.12);color:var(--violet);border:1px solid rgba(155,140,255,.3)}
+  .card h4{font-family:var(--display);font-weight:600;font-size:20px;margin-bottom:9px;letter-spacing:-.01em}
+  .card p{font-size:14.5px;color:var(--ink-dim);margin-bottom:10px}
+  .card .why{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);border-top:1px dashed var(--line2);padding-top:10px;margin-top:4px}
+  .card .why b{color:var(--amber);font-weight:500}
+  @media(max-width:780px){.changes{grid-template-columns:1fr}}
+
+  /* ---- timeline ---- */
+  .timeline{position:relative;padding-left:30px}
+  .timeline::before{content:'';position:absolute;left:6px;top:6px;bottom:6px;width:2px;background:linear-gradient(var(--cyan-dim),var(--amber-dim),var(--line))}
+  .step{position:relative;padding:0 0 24px 0}
+  .step::before{content:'';position:absolute;left:-30px;top:5px;width:14px;height:14px;border-radius:50%;background:var(--bg);border:2px solid var(--cyan);box-shadow:0 0 0 4px var(--bg)}
+  .step.rev::before{border-color:var(--amber)}
+  .step .sha{font-family:var(--mono);font-size:11px;color:var(--cyan)}
+  .step.rev .sha{color:var(--amber)}
+  .step .msg{font-size:15px;color:var(--ink);font-weight:500;margin-top:2px}
+  .step .det{font-size:13px;color:var(--ink-faint);margin-top:3px}
+
+  /* ---- review log ---- */
+  .reviews{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .rev{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:20px}
+  .rev .h{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint)}
+  .rev .v{font-family:var(--display);font-size:17px;font-weight:600;margin:8px 0 4px}
+  .rev .v.fix{color:var(--green)} .rev .v.stop{color:var(--red)}
+  .rev .b{font-size:12.5px;color:var(--ink-dim)}
+  .rev .catch{font-family:var(--mono);font-size:11.5px;color:var(--amber);margin-top:10px;border-top:1px dashed var(--line2);padding-top:9px}
+  @media(max-width:780px){.reviews,.metrics{grid-template-columns:repeat(2,1fr)}}
+
+  /* ---- ratify table ---- */
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);padding:0 14px 12px;border-bottom:1px solid var(--line2)}
+  td{padding:14px;border-bottom:1px solid var(--line);color:var(--ink-dim);vertical-align:top}
+  td b{color:var(--ink)}
+  td .oid{font-family:var(--mono);color:var(--amber);font-size:12px}
+  tr:hover td{background:var(--panel)}
+  .pill{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:2px;white-space:nowrap}
+  .pill.y{background:rgba(245,166,35,.14);color:var(--amber);border:1px solid var(--amber-dim)}
+  .pill.n{background:rgba(143,163,166,.1);color:var(--ink-dim);border:1px solid var(--line2)}
+
+  .principle{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:8px}
+  .pr{border:1px solid var(--line);border-radius:3px;padding:22px;background:linear-gradient(180deg,var(--panel),transparent)}
+  .pr .i{font-family:var(--mono);font-size:24px;color:var(--cyan)}
+  .pr h4{font-family:var(--display);font-size:18px;font-weight:600;margin:10px 0 7px}
+  .pr p{font-size:13.5px;color:var(--ink-dim)}
+  @media(max-width:780px){.principle{grid-template-columns:1fr}}
+
+  footer{padding:54px 0 80px;color:var(--ink-faint);font-family:var(--mono);font-size:12.5px}
+  footer .big{font-family:var(--display);font-size:22px;color:var(--ink);margin-bottom:14px;font-weight:600}
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">Engineering Change Report · OpenSearch Project</div>
+    <h1 class="title">The modular<br><em>rebuild</em>.</h1>
+    <p class="sub">A faithful, reviewer-friendly reorganization of <span class="mono">opensearch-mcp-server-py</span> — same external contract, a leaner core, and a fistful of real correctness fixes the old code was quietly shipping.</p>
+    <div class="repo-line">
+      <span><b>branch</b> rebuild/fastmcp-modular</span>
+      <span><b>base</b> 1a8b316</span>
+      <span><b>tests</b> 635 passing</span>
+      <span><b>ruff</b> clean</span>
+      <span><b>reviews</b> 4 adversarial passes</span>
+    </div>
+    <div class="verdict"><span class="dot"></span> Verdict: catalog split complete · 0 open blockers · every prior debt retired</div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="metrics reveal">
+    <div class="metric"><div class="x">network at boot</div><div class="n c-cyan">0</div><div class="l">outbound calls to build the tool catalog</div></div>
+    <div class="metric"><div class="x">tools.py</div><div class="n">1297&rarr;<span class="c-green">987</span></div><div class="l">monolith shrunk; metadata in per-domain modules</div></div>
+    <div class="metric"><div class="x">unit tests</div><div class="n c-amber">635</div><div class="l">passing · +110 over the 525 baseline</div></div>
+    <div class="metric"><div class="x">decisions logged</div><div class="n c-violet">17</div><div class="l">every fork resolved by a decision workflow</div></div>
+  </div>
+</div>
+
+<!-- 01 WHY -->
+<section><div class="wrap">
+  <div class="sec-head reveal"><span class="sec-num">01</span><h2>Why touch it at all</h2></div>
+  <p class="lead reveal">The server worked — but it carried a 1,297-line registry monolith, a runtime OpenAPI generator that fetched a spec from GitHub <em>on every boot</em>, and a handful of latent correctness bugs. The goal was a <b>middle ground</b>: reorganize for contributors and fix what's broken, <em>without</em> a ground-up rewrite that makes the diff unreviewable.</p>
+  <div class="principle reveal">
+    <div class="pr"><div class="i">&#9633;</div><h4>Correctness first</h4><p>Then maintainability, then latency &amp; memory. Behavior changes are deliberate and documented — never accidental drift.</p></div>
+    <div class="pr"><div class="i">&#8801;</div><h4>Minimal diff</h4><p>Prefer surgical in-place edits over new abstractions. A reviewer should grok each change against the old code in under 30 seconds.</p></div>
+    <div class="pr"><div class="i">&#10227;</div><h4>Test-gated</h4><p>The ~30 integration tests are the 1:1 oracle. Every phase stayed green; tool names, schemas, output text, CLI, env, and endpoints are unchanged.</p></div>
+  </div>
+</div></section>
+
+<!-- 02 OLD vs NEW -->
+<section><div class="wrap">
+  <div class="sec-head reveal"><span class="sec-num">02</span><h2>Old architecture &rarr; new</h2></div>
+  <div class="ovn reveal">
+    <div class="col old">
+      <h3>Before</h3>
+      <ul>
+        <li><b>1,297-line tools.py</b> — one giant <span class="mono">TOOL_REGISTRY</span> dict literal + 35 handlers</li>
+        <li><b>Runtime OpenAPI generator</b> fetched a spec from an unpinned GitHub branch at every startup (no timeout, 30s+ hang offline, <span class="mono">print()</span> into the stdio JSON-RPC stream)</li>
+        <li><b>A fresh client + <span class="mono">GET /</span></b> on <em>every single</em> tool call just to gate the version</li>
+        <li><b>Tool errors reported as success</b> — failures never set the MCP <span class="mono">isError</span> flag</li>
+        <li><b>Response-size limit off by default</b> despite docs promising 10MB; a 404 could fire two HTTP requests</li>
+        <li><b>Partial AWS creds</b> silently fell through to the server's ambient identity</li>
+      </ul>
+    </div>
+    <div class="mid">&rarr;</div>
+    <div class="col new">
+      <h3>After</h3>
+      <ul>
+        <li><b>987-line tools.py</b> — metadata in per-domain modules, composed via an explicit 5-group manifest</li>
+        <li><b>Generator deleted.</b> 4 static tools, byte-locked to a golden snapshot. <b>Zero network</b> to build the catalog</li>
+        <li><b>Per-target version cache</b> (TTL, async-safe) collapses the per-call probe; bypassed under header-auth</li>
+        <li><b>Failures set <span class="mono">isError=true</span></b> on the wire — verified end-to-end against the SDK</li>
+        <li><b>10MB enforced by default</b>, streamed with early abort; transport errors propagate, never re-issued</li>
+        <li><b>Partial creds fail secure</b> (raise); URL credentials scrubbed from logs (CWE-532)</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+<!-- 03 WHAT CHANGED -->
+<section><div class="wrap">
+  <div class="sec-head reveal"><span class="sec-num">03</span><h2>What actually changed</h2></div>
+  <p class="lead reveal">Five headline changes. Each ties back to a cited audit finding and a logged decision — nothing here is reorganization for its own sake.</p>
+  <div class="changes">
+    <div class="card reveal"><span class="tag t-fix">Correctness · O1</span><h4>The <span class="mono">isError</span> contract</h4><p>Tool-execution failures (connection refused, index_not_found, parse errors, 4xx/5xx) now set <span class="mono">CallToolResult.isError=true</span>. Before, spec-compliant clients and LLM agents saw <em>every</em> error as a success.</p><div class="why"><b>Why:</b> the #1 audit finding. Fixed at one chokepoint; exact error text preserved in content.</div></div>
+
+    <div class="card reveal"><span class="tag t-struct">Structure · P0</span><h4>Generator, deleted</h4><p>The boot-time OpenAPI fetch is gone. Its 4 tools are now static, hand-written, and locked to a snapshot captured from the live generator before deletion. The server builds its 48-tool catalog with no outbound connection.</p><div class="why"><b>Why:</b> a network dependency, a 30s offline hang, and a stdout write that corrupts the stdio protocol — all removed.</div></div>
+
+    <div class="card reveal"><span class="tag t-perf">Efficiency · P1</span><h4>Version-gate caching</h4><p>The compatibility gate ran a fresh client + <span class="mono">GET /</span> on every call. Now a per-connection-target, TTL-bounded, async-safe cache serves it — with a per-request bypass when header auth makes the target dynamic.</p><div class="why"><b>Why:</b> doubled network round-trips per tool call against a value that rarely changes.</div></div>
+
+    <div class="card reveal"><span class="tag t-sec">Memory &amp; safety</span><h4>Response-size limiting</h4><p>10MB enforced by default (matching the docs), checked incrementally while streaming so it aborts before buffering the whole body. The error-re-issuing fallback — which double-fired non-idempotent writes — was deleted.</p><div class="why"><b>Why:</b> protection was silently off; the old fallback was a correctness hazard.</div></div>
+
+    <div class="card reveal"><span class="tag t-sec">Security</span><h4>Auth, hardened in place</h4><p>Partial AWS header credentials now fail secure instead of borrowing the server's identity. URL userinfo is scrubbed from logs, the IAM ARN moved off INFO, and the bearer path no longer drops the custom User-Agent.</p><div class="why"><b>Why:</b> privilege-confusion + CWE-532 log leakage. A 280-line "resolver" was built, reviewed, then deleted in favor of a +53/-9 surgical fix.</div></div>
+
+    <div class="card reveal"><span class="tag t-struct">Structure · P1</span><h4>The monolith, split</h4><p>The 343-line registry literal became a typed, fail-loud <span class="mono">ToolRegistry</span> composed from per-domain modules in an explicit group order. Handlers stayed put — only metadata moved — so git-blame is preserved and the diff is ~30 lines of wiring.</p><div class="why"><b>Why:</b> adding a tool meant editing a giant dict. Now each tool lives in a greppable module.</div></div>
+  </div>
+</div></section>
+
+<!-- 04 PROCESS / TIMELINE -->
+<section><div class="wrap">
+  <div class="sec-head reveal"><span class="sec-num">04</span><h2>How it was built</h2></div>
+  <p class="lead reveal">Nineteen commits, each independently green. Decision forks (cyan) were settled by multi-agent decision workflows; review fixes (amber) close findings from a standing adversarial critic.</p>
+  <div class="timeline reveal">
+    <div class="step"><div class="sha">17e2d73</div><div class="msg">Pin mcp&gt;=1.25,&lt;2 · capture generated-tools golden snapshot</div><div class="det">Froze the fidelity oracle before deleting anything.</div></div>
+    <div class="step"><div class="sha">027b495 · a56326b</div><div class="msg">Scaffold: typed ToolRegistry, compat leaf, composition manifest</div></div>
+    <div class="step"><div class="sha">704b52d · f5b8719</div><div class="msg">Static generated tools &rarr; delete the runtime OpenAPI generator</div><div class="det">Proven: 48 tools build with zero outbound network.</div></div>
+    <div class="step rev"><div class="sha">d34f59d · review #1</div><div class="msg">Fix ordering single-source, settings truthy-union, cache lock, cycle</div></div>
+    <div class="step"><div class="sha">1e8c4e7 · 9a0a474 · f379092</div><div class="msg">Wire version cache · response-size redesign · surgical auth fixes</div></div>
+    <div class="step rev"><div class="sha">aa2a472 · review #2 (STOP-AND-FIX)</div><div class="msg">Caught a shipped crash bug: connection.py UnboundLocalError masking transport errors</div></div>
+    <div class="step"><div class="sha">4230d87</div><div class="msg">Split the tools.py monolith; delete unwired scaffold</div></div>
+    <div class="step rev"><div class="sha">3456d52 · review #3</div><div class="msg">Break the core.py import cycle · params fidelity · multi-mode cache bleed</div></div>
+    <div class="step"><div class="sha">5959441</div><div class="msg">Fix the MCP isError contract — verified on the wire</div></div>
+    <div class="step rev"><div class="sha">b543c84 · review #4</div><div class="msg">Model the generated group · test the registry · honest golden language</div><div class="det">"In shape to call the catalog split done."</div></div>
+  </div>
+</div></section>
+
+<!-- 05 ADVERSARIAL REVIEW -->
+<section><div class="wrap">
+  <div class="sec-head reveal"><span class="sec-num">05</span><h2>The adversarial loop</h2></div>
+  <p class="lead reveal">A standing critic re-ran at every checkpoint across five lenses — architecture, fidelity, code quality, simplicity, and <em>minimal-diff</em>. It earned its keep: it caught a real shipped crash bug, a security-adjacent fidelity slip, a concurrency defect, and an import cycle — none of which the test suite alone would have flagged.</p>
+  <div class="reviews reveal">
+    <div class="rev"><div class="h">Review #1</div><div class="v fix">Proceed&#8202;/&#8202;fixes</div><div class="b">0 blockers · 4 fixed</div><div class="catch">Caught: a settings parser quietly widened the truthy set for the auth flags.</div></div>
+    <div class="rev"><div class="h">Review #2</div><div class="v stop">Stop &amp; fix</div><div class="b">1 blocker · fixed</div><div class="catch">Caught: an UnboundLocalError that masked the real transport error — untested.</div></div>
+    <div class="rev"><div class="h">Review #3</div><div class="v fix">Proceed&#8202;/&#8202;fixes</div><div class="b">0 blockers · 3 majors</div><div class="catch">Caught: tools.py&#8596;core.py import cycle; a cross-cluster cache bleed.</div></div>
+    <div class="rev"><div class="h">Review #4</div><div class="v fix">Proceed&#8202;/&#8202;fixes</div><div class="b">0 blockers · no defects</div><div class="catch">Confirmed: every prior debt retired; isError fix empirically correct.</div></div>
+  </div>
+</div></section>
+
+<!-- 06 RATIFY -->
+<section><div class="wrap">
+  <div class="sec-head reveal"><span class="sec-num">06</span><h2>Observable changes to ratify</h2></div>
+  <p class="lead reveal">The rebuild preserves the external contract — but these deliberate correctness/safety fixes are <em>client-visible</em>. They're in the CHANGELOG; each is flagged for a maintainer's explicit sign-off.</p>
+  <table class="reveal">
+    <thead><tr><th>ID</th><th>Change</th><th>Why it's right</th><th>Ratify</th></tr></thead>
+    <tbody>
+      <tr><td class="oid">O1</td><td><b>isError=true</b> on tool failures</td><td>MCP spec compliance; clients can finally distinguish failure from success</td><td><span class="pill y">yes</span></td></tr>
+      <tr><td class="oid">O2</td><td><b>10MB</b> response cap enforced by default</td><td>Matches the docs; prevents OOM. Opt out via env / per-call override</td><td><span class="pill y">yes</span></td></tr>
+      <tr><td class="oid">O3</td><td>Transport errors <b>propagate</b> (no silent re-issue)</td><td>Fixes a 404 firing two requests — unsafe for non-idempotent writes</td><td><span class="pill y">yes</span></td></tr>
+      <tr><td class="oid">O4</td><td>Partial AWS creds <b>raise</b></td><td>Fail-secure; closes privilege-confusion. No legitimate caller affected</td><td><span class="pill n">no</span></td></tr>
+      <tr><td class="oid">O10</td><td>Generated tools type-validate base args</td><td>More correct; aligns the 4 tools with every other tool</td><td><span class="pill n">no</span></td></tr>
+      <tr><td>&#8212;</td><td>Version gate may use a cached version (&le; TTL)</td><td>Kills per-call churn; bounded &amp; configurable (default 600s)</td><td><span class="pill y">yes</span></td></tr>
+    </tbody>
+  </table>
+</div></section>
+
+<footer><div class="wrap">
+  <div class="big">Faithful where it counts. Fixed where it mattered.</div>
+  <p>Full trail: <a href="DECISION_LOG.md">DECISION_LOG.md</a> (D0&ndash;D17, authoritative) &middot; <a href="ADVERSARIAL_REVIEW_LOG.md">ADVERSARIAL_REVIEW_LOG.md</a> (4 checkpoints) &middot; <a href="AUDIT_FINDINGS.md">AUDIT_FINDINGS.md</a> &middot; <a href="../../CHANGELOG.md">CHANGELOG.md</a></p>
+  <p style="margin-top:10px">When the process docs disagree with the code or the decision log, the code and the decision log win. See <a href="README.md">docs/rebuild/README.md</a> for what's superseded.</p>
+  <p style="margin-top:18px;color:var(--ink-faint)">opensearch-mcp-server-py · modular rebuild · generated for maintainer review</p>
+</div></footer>
+
+<script>
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});
+  document.querySelectorAll('.reveal').forEach((el,i)=>{el.style.transitionDelay=(Math.min(i,6)*60)+'ms';io.observe(el)});
+</script>
+</body>
+</html>

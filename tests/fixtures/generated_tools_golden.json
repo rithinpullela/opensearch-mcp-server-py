@@ -1,0 +1,634 @@
+{
+  "ClusterHealthTool": {
+    "description": "Returns basic information about the health of the cluster.",
+    "display_name": "ClusterHealthTool",
+    "http_methods": "GET",
+    "input_schema": {
+      "properties": {
+        "aws_iam_arn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "IAM role ARN for role-based authentication.",
+          "title": "Aws Iam Arn"
+        },
+        "aws_opensearch_serverless": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If true, use OpenSearch Serverless service.",
+          "title": "Aws Opensearch Serverless"
+        },
+        "aws_profile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AWS profile name for authentication.",
+          "title": "Aws Profile"
+        },
+        "aws_region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AWS region for IAM/Serverless authentication.",
+          "title": "Aws Region"
+        },
+        "index": {
+          "title": "Index",
+          "type": "string"
+        },
+        "opensearch_cluster_name": {
+          "description": "The name of the OpenSearch cluster",
+          "title": "Opensearch Cluster Name",
+          "type": "string"
+        },
+        "opensearch_no_auth": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If true, connect without authentication.",
+          "title": "Opensearch No Auth"
+        },
+        "opensearch_password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Password for basic authentication.",
+          "title": "Opensearch Password"
+        },
+        "opensearch_ssl_verify": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If false, disable SSL certificate verification.",
+          "title": "Opensearch Ssl Verify"
+        },
+        "opensearch_timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Connection timeout in seconds.",
+          "title": "Opensearch Timeout"
+        },
+        "opensearch_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OpenSearch endpoint URL.",
+          "title": "Opensearch Url"
+        },
+        "opensearch_username": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Username for basic authentication.",
+          "title": "Opensearch Username"
+        }
+      },
+      "title": "ClusterHealthArgs",
+      "type": "object"
+    },
+    "max_version": "99.99.99",
+    "min_version": "1.0"
+  },
+  "CountTool": {
+    "description": "Returns number of documents matching a query.",
+    "display_name": "CountTool",
+    "http_methods": "GET, POST",
+    "input_schema": {
+      "properties": {
+        "aws_iam_arn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "IAM role ARN for role-based authentication.",
+          "title": "Aws Iam Arn"
+        },
+        "aws_opensearch_serverless": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If true, use OpenSearch Serverless service.",
+          "title": "Aws Opensearch Serverless"
+        },
+        "aws_profile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AWS profile name for authentication.",
+          "title": "Aws Profile"
+        },
+        "aws_region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AWS region for IAM/Serverless authentication.",
+          "title": "Aws Region"
+        },
+        "body": {
+          "description": "Request body",
+          "title": "Body"
+        },
+        "index": {
+          "title": "Index",
+          "type": "string"
+        },
+        "opensearch_cluster_name": {
+          "description": "The name of the OpenSearch cluster",
+          "title": "Opensearch Cluster Name",
+          "type": "string"
+        },
+        "opensearch_no_auth": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If true, connect without authentication.",
+          "title": "Opensearch No Auth"
+        },
+        "opensearch_password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Password for basic authentication.",
+          "title": "Opensearch Password"
+        },
+        "opensearch_ssl_verify": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If false, disable SSL certificate verification.",
+          "title": "Opensearch Ssl Verify"
+        },
+        "opensearch_timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Connection timeout in seconds.",
+          "title": "Opensearch Timeout"
+        },
+        "opensearch_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OpenSearch endpoint URL.",
+          "title": "Opensearch Url"
+        },
+        "opensearch_username": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Username for basic authentication.",
+          "title": "Opensearch Username"
+        }
+      },
+      "title": "CountArgs",
+      "type": "object"
+    },
+    "max_version": "99.99.99",
+    "min_version": "1.0"
+  },
+  "ExplainTool": {
+    "description": "Returns information about why a specific document matches (or doesn't match) a query.",
+    "display_name": "ExplainTool",
+    "http_methods": "GET, POST",
+    "input_schema": {
+      "properties": {
+        "aws_iam_arn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "IAM role ARN for role-based authentication.",
+          "title": "Aws Iam Arn"
+        },
+        "aws_opensearch_serverless": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If true, use OpenSearch Serverless service.",
+          "title": "Aws Opensearch Serverless"
+        },
+        "aws_profile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AWS profile name for authentication.",
+          "title": "Aws Profile"
+        },
+        "aws_region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AWS region for IAM/Serverless authentication.",
+          "title": "Aws Region"
+        },
+        "body": {
+          "description": "Request body containing the query to explain.",
+          "title": "Body"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "index": {
+          "title": "Index",
+          "type": "string"
+        },
+        "opensearch_cluster_name": {
+          "description": "The name of the OpenSearch cluster",
+          "title": "Opensearch Cluster Name",
+          "type": "string"
+        },
+        "opensearch_no_auth": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If true, connect without authentication.",
+          "title": "Opensearch No Auth"
+        },
+        "opensearch_password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Password for basic authentication.",
+          "title": "Opensearch Password"
+        },
+        "opensearch_ssl_verify": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If false, disable SSL certificate verification.",
+          "title": "Opensearch Ssl Verify"
+        },
+        "opensearch_timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Connection timeout in seconds.",
+          "title": "Opensearch Timeout"
+        },
+        "opensearch_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OpenSearch endpoint URL.",
+          "title": "Opensearch Url"
+        },
+        "opensearch_username": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Username for basic authentication.",
+          "title": "Opensearch Username"
+        }
+      },
+      "required": [
+        "body",
+        "id",
+        "index"
+      ],
+      "title": "ExplainArgs",
+      "type": "object"
+    },
+    "max_version": "99.99.99",
+    "min_version": "1.0"
+  },
+  "MsearchTool": {
+    "description": "Allows to execute several search operations in one request.",
+    "display_name": "MsearchTool",
+    "http_methods": "GET, POST",
+    "input_schema": {
+      "properties": {
+        "aws_iam_arn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "IAM role ARN for role-based authentication.",
+          "title": "Aws Iam Arn"
+        },
+        "aws_opensearch_serverless": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If true, use OpenSearch Serverless service.",
+          "title": "Aws Opensearch Serverless"
+        },
+        "aws_profile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AWS profile name for authentication.",
+          "title": "Aws Profile"
+        },
+        "aws_region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AWS region for IAM/Serverless authentication.",
+          "title": "Aws Region"
+        },
+        "body": {
+          "description": "Request body as NDJSON format: alternating lines of header and query objects ending with \\n. Alternatively, pass a JSON array [header, query, header, query, ...] and the tool will convert it to NDJSON for you.",
+          "title": "Body"
+        },
+        "index": {
+          "title": "Index",
+          "type": "string"
+        },
+        "opensearch_cluster_name": {
+          "description": "The name of the OpenSearch cluster",
+          "title": "Opensearch Cluster Name",
+          "type": "string"
+        },
+        "opensearch_no_auth": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If true, connect without authentication.",
+          "title": "Opensearch No Auth"
+        },
+        "opensearch_password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Password for basic authentication.",
+          "title": "Opensearch Password"
+        },
+        "opensearch_ssl_verify": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If false, disable SSL certificate verification.",
+          "title": "Opensearch Ssl Verify"
+        },
+        "opensearch_timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Connection timeout in seconds.",
+          "title": "Opensearch Timeout"
+        },
+        "opensearch_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OpenSearch endpoint URL.",
+          "title": "Opensearch Url"
+        },
+        "opensearch_username": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Username for basic authentication.",
+          "title": "Opensearch Username"
+        }
+      },
+      "required": [
+        "body"
+      ],
+      "title": "MsearchArgs",
+      "type": "object"
+    },
+    "max_version": "99.99.99",
+    "min_version": "1.0"
+  }
+}
