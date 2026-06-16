@@ -30,3 +30,9 @@ wheels/
 /__pycache__
 
 tmp
+
+# Node deps (an MCP JS client/inspector dropped these; not part of this Python package)
+node_modules/
+
+# Local agent/tooling scratch (not project code)
+.claude/
