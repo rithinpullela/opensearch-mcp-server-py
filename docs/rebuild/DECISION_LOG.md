@@ -275,3 +275,35 @@ MINORs deferred (documented, non-correctness): required-order normalization note
 unbounded-by-design + TTL-staleness CHANGELOG sentence, connection success-path buffering docstring,
 generated/ file count. These are O-list/docstring polish, tracked.
 Gate: 635 passed, ruff clean.
+
+## D18 — Handoff summary (rebuild complete)
+The modular rebuild is functionally complete on branch `rebuild/fastmcp-modular` (20 commits off
+baseline 1a8b316). Final state: **635 unit tests pass**, ruff clean, registry byte-identical (48
+tools, plain dict, exact legacy order, zero boot-time network), server verified booting + serving
+(stdio build + stream `/health` 200, bare `/mcp` no-307, `initialize` handshake). Four adversarial
+reviews cleared (0 open blockers). Net src churn vs baseline: +1830/-797.
+
+**What shipped (each tied to an audit finding + a logged decision):**
+- Deleted the runtime OpenAPI generator (boot-time GitHub fetch / stdout-corruption / 30s offline
+  hang); 4 tools now static + golden-locked (D7, P0-1).
+- Wired a per-target TTL version cache; killed the per-call GET / probe; header-auth bypass single
+  + multi mode (D6/D13/D15, P1-1).
+- Fixed the MCP isError contract — failures now set isError=true on the wire (D16, O1, P1-3).
+- Response-size: 10MB default enforced, streaming early-abort, surrogatepass decode, deleted the
+  request-re-issuing fallback (D12, O2/O3, P1-5/6/7/9/10).
+- Auth hardened in place: partial-cred fail-secure, URL-userinfo scrub, IAM-ARN→DEBUG, bearer UA
+  preserved; built-then-DELETED a 280-line resolver as YAGNI (D11, O4).
+- Split the 1297→987 line tools.py monolith into per-domain modules behind a typed ToolRegistry +
+  explicit 5-group manifest; deleted the unwired context.py/settings.py scaffold (D14/D17, P1-17).
+
+**OPEN for the maintainer:**
+1. Ratify the observable changes flagged "yes" in the CHANGELOG / REBUILD_REPORT.html table
+   (O1 isError, O2 10MB cap, O3 error-propagation, version-cache staleness).
+2. Pre-existing minor not fixed (out of scope, minimal-diff): serverInfo.version reports the MCP SDK
+   version, not the package version (audit P3-12).
+3. Deferred non-correctness polish (documented, low priority): ERROR_LOGGING_EVALUATION funnel
+   consolidation (double tool_error/tool_execution event, redaction filter), version-cache
+   unbounded-by-design note, generated/ file-count. None block shipping.
+
+Deliverables: this DECISION_LOG (D0–D18), ADVERSARIAL_REVIEW_LOG (4 checkpoints), CHANGELOG
+(Unreleased), and docs/rebuild/REBUILD_REPORT.html (the maintainer-facing visual summary).
